@@ -1,0 +1,72 @@
+---
+title: "EDA on first Data Pull (19-11-2019)"
+---
+
+## Prepare Notebook
+
+```{r}
+library(lubridate)
+library(tidyverse)
+```
+
+## Read Data
+
+```{r}
+raw_df <- readRDS(file = "../data/19_11_2019_twitter_21n.rds")
+```
+
+## EDA
+
+Let us get a glimpse on the data. 
+
+```{r}
+glimpse(raw_df)
+```
+
+### Languages
+
+**Warning:** We have tweets in japanese and arabic. We might be able to remove them using the `lang` feature. 
+
+```{r}
+raw_df %>% 
+  filter(is.na(lang)) %>% 
+  nrow()
+```
+
+```{r, fig.align="center"}
+raw_df %>% 
+  group_by(lang) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(lang = reorder(lang, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  ggtitle(label = "Language Count")
+```
+
+Spanish is by far the most used language. 
+
+### Timeframe 
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour, is_retweet) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+We do not see a big increase in organic tweets. 
