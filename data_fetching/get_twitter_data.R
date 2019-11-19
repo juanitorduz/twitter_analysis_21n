@@ -1,3 +1,4 @@
+# Select relevant keywords to fetch data. 
 twitter_terms <- c(
   "21N", 
   "#21N", 
@@ -16,15 +17,7 @@ twitter_terms <- c(
 
 twitter_query <- stringr::str_c(twitter_terms, collapse = " OR ")
 
-raw_df <- search_tweets(
-  q = twitter_query, 
-  n = 2E5, 
-  type = "recent", 
-  include_rts = TRUE, 
-  parse = TRUE, 
-  retryonratelimit = TRUE, 
-  verbose = TRUE
-)
+# Fetch data usinng rtweet. 
 
 raw_df <- rtweet::search_tweets(
   q = twitter_query, 
@@ -36,4 +29,7 @@ raw_df <- rtweet::search_tweets(
   verbose = TRUE
 )
 
-#saveRDS(object = raw_df, file = "19_11_2019_twitter_21n.rds")
+# Save as .rds format. 
+# This is needed because the data comes as a nested dataframe with
+# columns of type list. 
+# saveRDS(object = raw_df, file = "19_11_2019_twitter_21n.rds")
