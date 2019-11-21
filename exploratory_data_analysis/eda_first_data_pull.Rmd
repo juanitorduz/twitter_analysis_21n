@@ -5,7 +5,10 @@ title: "EDA on first Data Pull (19-11-2019)"
 ## Prepare Notebook
 
 ```{r}
+library(igraph)
+library(magrittr)
 library(lubridate)
+library(networkD3)
 library(tidyverse)
 ```
 
@@ -40,7 +43,7 @@ raw_df %>%
   ungroup() %>% 
   mutate(lang = reorder(lang, n)) %>%  
   ggplot(mapping = aes(x = lang, y = n)) +
-  geom_bar(stat = "identity") +
+  geom_col() +
   coord_flip() +
   ggtitle(label = "Language Count")
 ```
@@ -70,3 +73,160 @@ raw_df %>%
 ```
 
 We do not see a big increase in organic tweets. 
+
+### Hashtags
+
+```{r}
+hashtags_vect <- raw_df %>% 
+  filter(! is.na(hashtags)) %>% 
+  pull(hashtags) %>% 
+  unlist()
+
+hashtags_df <- tibble(hashtag = hashtags_vect) %>% 
+  mutate(hashtag = str_to_lower(string = hashtag)) %>% 
+  count(hashtag) %>% 
+  arrange(-n)
+```
+
+```{r, fig.height=5}
+hashtags_df %>% mutate(n = n /sum(n)) %>% 
+  top_n(n = 40, wt = n) %>% 
+  mutate(hashtag = reorder(hashtag, n)) %>%
+  ggplot(aes(x = hashtag, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = 'Hashtag Count')
+```
+
+### Retweet Network 
+
+Let us define a retweet weighted directed network as follows:
+
+- Nodes: 
+  - Source = `screen_name` 
+  - Target = `retweet_screen_name`
+  
+- Edges: Two nodes are conected if there is at least `threshold` number of retweets. 
+
+- Weight: number of retweets. 
+
+For visualization purposes: Let `threshold` > 0. We can filter edges which have weight less than `threshold`. 
+
+First, we construct a data frame. 
+
+```{r}
+# Construct retweet network. 
+retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name)
+```
+
+We now construct the network from the dataframe above. 
+
+```{r}
+retweets_graph <- graph_from_data_frame(d = retweets_df, directed = TRUE)
+```
+
+We store the in/out degree as node atributes. 
+
+```{r}
+# Store the in_degree.
+V(retweets_graph)$in_degree <- degree(graph = retweets_graph, mode = "in", loops = TRUE)
+# Store the out_degree.
+V(retweets_graph)$out_degree <- degree(graph = retweets_graph, mode = "out", loops = TRUE)
+```
+
+Let us store the in/out degree of the nodes in a data frame.
+
+```{r}
+retweets_node_df <- tibble(
+  screen_name = V(retweets_graph)$name, 
+  in_degree = V(retweets_graph)$in_degree, 
+  out_degree = V(retweets_graph)$out_degree
+)
+```
+
+Now we compute the number of in/out retweets per user.
+
+```{r}
+tweets_out_df <- retweets_df %>% 
+  select(screen_name, n) %>% 
+  group_by(screen_name) %>% 
+  summarise(tweets_out = sum(n))
+
+tweets_in_df <- retweets_df %>%
+  select(retweet_screen_name, n) %>% 
+  group_by(retweet_screen_name) %>% 
+  summarise(tweets_in = sum(n))
+
+retweets_node_df %<>% 
+  left_join(y = tweets_out_df, by = c("screen_name")) %>% 
+  left_join(y = tweets_in_df, by = c("screen_name" = "retweet_screen_name"))
+```
+
+We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most. 
+
+```{r}
+retweets_node_df %>% arrange(- tweets_in)
+```
+
+Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+
+```{r}
+retweets_node_df %>% arrange(- tweets_out)
+```
+
+- Visualization
+
+```{r}
+# Set weight threshold. 
+threshold <- 5
+
+red_retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name) %>% 
+  filter(n >= threshold)
+
+red_retweets_graph <- graph_from_data_frame(d = red_retweets_df, directed = TRUE)
+
+# Store the in_degree.
+V(red_retweets_graph)$in_degree <- degree(graph = red_retweets_graph, mode = "in")
+# Store the out_degree.
+V(red_retweets_graph)$out_degree <- degree(graph = red_retweets_graph, mode = "out")
+```
+
+```{r}
+# Compute the weight shares.
+E(red_retweets_graph)$width <- E(red_retweets_graph)$n/max(E(red_retweets_graph)$n)
+
+# Create networkD3 object.
+network_d3 <- igraph_to_networkD3(g = red_retweets_graph)
+# Define node size.
+network_d3$nodes %<>% mutate(Degree = 1*V(red_retweets_graph)$in_degree)
+# Degine color group (I will explore this feature later).
+network_d3$nodes %<>% mutate(Group = 1)
+# Define edges width. 
+network_d3$links$Width <- 10*E(red_retweets_graph)$width
+
+forceNetwork(
+  Links = network_d3$links, 
+  Nodes = network_d3$nodes, 
+  arrows = TRUE,
+  Source = 'source', 
+  Target = 'target',
+  NodeID = 'name',
+  Group = 'Group', 
+  opacity = 0.9,
+  Value = 'Width',
+  Nodesize = 'Degree', 
+  # We input a JavaScript function.
+  linkWidth = JS("function(d) { return Math.sqrt(d.value); }"), 
+  fontSize = 12,
+  zoom = TRUE, 
+  opacityNoHover = 1
+)
+```
+
