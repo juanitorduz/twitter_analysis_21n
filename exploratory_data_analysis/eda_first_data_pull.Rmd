@@ -9,7 +9,11 @@ library(igraph)
 library(magrittr)
 library(lubridate)
 library(networkD3)
+library(tidytext)
 library(tidyverse)
+library(tm)
+library(widyr)
+library(wordcloud)
 ```
 
 ## Read Data
@@ -74,6 +78,24 @@ raw_df %>%
 
 We do not see a big increase in organic tweets. 
 
+### Location
+
+```{r, fig.align="center"}
+raw_df %>% 
+  mutate(location = case_when(location == "" ~ "no-tag", TRUE ~ str_to_lower(location))) %>% 
+  group_by(location) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(n = n /sum(n)) %>% 
+  arrange(- n) %>% 
+  head(20) %>% 
+  mutate(lang = reorder(location, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle(label = "Location Count")
+```
+
 ### Hashtags
 
 ```{r}
@@ -88,9 +110,9 @@ hashtags_df <- tibble(hashtag = hashtags_vect) %>%
   arrange(-n)
 ```
 
-```{r, fig.height=5}
+```{r, fig.height=4}
 hashtags_df %>% mutate(n = n /sum(n)) %>% 
-  top_n(n = 40, wt = n) %>% 
+  top_n(n = 50, wt = n) %>% 
   mutate(hashtag = reorder(hashtag, n)) %>%
   ggplot(aes(x = hashtag, y = n)) +
   geom_col() +
@@ -98,6 +120,33 @@ hashtags_df %>% mutate(n = n /sum(n)) %>%
   coord_flip() +
   ggtitle(label = 'Hashtag Count')
 ```
+
+### Top - Tweets
+
+```{r, fig.height=4}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  group_by(screen_name) %>% 
+  summarise(retweet_count = sum(retweet_count)) %>% 
+  ungroup() %>% 
+  arrange(- retweet_count) %>% 
+  head(50) %>% 
+  mutate(screen_name = reorder(screen_name, retweet_count)) %>%
+  ggplot(aes(x = screen_name, y = retweet_count)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = 'Top Retweeted Users')
+```
+
+
+```{r}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  select(screen_name, text, retweet_count) %>% 
+  arrange(- retweet_count)
+```
+
 
 ### Retweet Network 
 
@@ -159,6 +208,10 @@ compute_weighted_deg_df <- function (retweets_graph) {
 retweets_node_df <- compute_weighted_deg_df(retweets_graph)
 ```
 
+```{r}
+retweets_node_df %>% arrange(- tweets_in)
+```
+
 We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most. 
 
 ```{r}
@@ -181,7 +234,7 @@ V(retweets_graph)$tweets_out <- retweets_node_df$tweets_out
 
 ```{r}
 # Set weight threshold. 
-threshold <- 5
+threshold <- 4
 
 red_retweets_df <- raw_df %>% 
   filter(is_retweet == TRUE) %>% 
@@ -230,4 +283,76 @@ network_d3_viz <- forceNetwork(
 
 saveNetwork(network = network_d3_viz, file = "retweet_network.html", selfcontained = TRUE)
 ```
+
+### Text Analysis
+
+- Text Cleaning
+
+```{r}
+tweets_corpus <- VCorpus(
+  VectorSource(
+    raw_df %>% 
+      filter(lang == "es") %>% 
+      mutate(text = str_to_lower(text)) %>% 
+      pull(text)
+  )
+)
+```
+
+```{r}
+rm_pattern <- content_transformer( 
+  function (x, pattern) str_remove_all(string = x, pattern = pattern)
+)
+
+url_pattern <- "(f|ht)tp(s?)://\\S+"
+
+clean_tweets_corpus <- tweets_corpus %>% 
+  tm_map(rm_pattern, "/") %>% 
+  tm_map(rm_pattern, "\\|") %>% 
+  tm_map(rm_pattern, url_pattern) %>% 
+  tm_map(stripWhitespace) %>% 
+  tm_map(PlainTextDocument)
+
+clean_tweets_df <- tibble(
+  clean_text = sapply(X = clean_tweets_corpus, FUN = function(x) x$content)
+)
+  
+```
+
+```{r}
+clean_tweets_df %>% head(10)
+```
+
+```{r}
+stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
+
+words_df <- clean_tweets_df %>% 
+  unnest_tokens(output = word, input = clean_text) %>% 
+  anti_join(y = stopwords_df, by = "word")
+
+word_count <- words_df %>% 
+  count(word) %>% 
+  arrange(- n)
+```
+
+```{r, fig.height=4}
+word_count %>% 
+  head(50) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Word Count")
+```
+
+
+```{r, fig.width=4, fig.align="center"}
+wordcloud(
+  words = word_count$word, 
+  freq = word_count$n, 
+  min.freq = 3000, 
+  colors = brewer.pal(8, 'Dark2'))
+```
+
 
