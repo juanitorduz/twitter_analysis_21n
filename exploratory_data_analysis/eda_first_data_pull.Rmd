@@ -110,7 +110,7 @@ hashtags_df <- tibble(hashtag = hashtags_vect) %>%
   arrange(-n)
 ```
 
-```{r, fig.height=4}
+```{r, fig.height=8}
 hashtags_df %>% mutate(n = n /sum(n)) %>% 
   top_n(n = 50, wt = n) %>% 
   mutate(hashtag = reorder(hashtag, n)) %>%
@@ -121,9 +121,18 @@ hashtags_df %>% mutate(n = n /sum(n)) %>%
   ggtitle(label = 'Hashtag Count')
 ```
 
+```{r, fig.width=8, fig.align="center"}
+wordcloud(
+  words = hashtags_df$hashtag, 
+  freq = hashtags_df$n, 
+  min.freq = 200, 
+  colors = brewer.pal(8, "Dark2"))
+
+```
+
 ### Top - Tweets
 
-```{r, fig.height=4}
+```{r, fig.height=8}
 raw_df %>% 
   filter(is_retweet == FALSE) %>% 
   group_by(screen_name) %>% 
@@ -304,7 +313,7 @@ rm_pattern <- content_transformer(
   function (x, pattern) str_remove_all(string = x, pattern = pattern)
 )
 
-url_pattern <- "(f|ht)tp(s?)://\\S+"
+url_pattern <- " ?(f|ht)(tp)(s?):(//)?\\S+"
 
 clean_tweets_corpus <- tweets_corpus %>% 
   tm_map(rm_pattern, "/") %>% 
@@ -316,12 +325,13 @@ clean_tweets_corpus <- tweets_corpus %>%
 clean_tweets_df <- tibble(
   clean_text = sapply(X = clean_tweets_corpus, FUN = function(x) x$content)
 )
-  
 ```
 
 ```{r}
-clean_tweets_df %>% head(10)
+clean_tweets_df %>% head(100)
 ```
+
+- Word Count
 
 ```{r}
 stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
@@ -335,7 +345,7 @@ word_count <- words_df %>%
   arrange(- n)
 ```
 
-```{r, fig.height=4}
+```{r, fig.height=8}
 word_count %>% 
   head(50) %>%
   mutate(word = reorder(word, n)) %>%
@@ -347,12 +357,59 @@ word_count %>%
 ```
 
 
-```{r, fig.width=4, fig.align="center"}
+```{r, fig.width=8, fig.align="center"}
 wordcloud(
   words = word_count$word, 
   freq = word_count$n, 
-  min.freq = 3000, 
-  colors = brewer.pal(8, 'Dark2'))
+  min.freq = 2500, 
+  colors = brewer.pal(8, "Dark2"))
 ```
+
+- 2-Gram Network
+
+```{r}
+bigram_count <- clean_tweets_df %>% 
+  unnest_tokens(input = clean_text, output = bigram, token = "ngrams", n = 2) %>% 
+  separate(col = bigram, into = c("word1", "word2"), sep = " ") %>% 
+  filter(! word1 %in% stopwords_df$word) %>% 
+  filter(! word2 %in% stopwords_df$word) %>% 
+  filter(! is.na(word1)) %>% 
+  filter(! is.na(word2)) %>% 
+  count(word1, word2, sort = TRUE)
+  
+```
+
+```{r}
+bigram_threshold <- 1000
+
+bigram_network <- bigram_count %>%
+  filter(n > bigram_threshold) %>%
+  graph_from_data_frame(directed = FALSE)
+```
+
+```{r, fig.width=10, fig.height=10,  fig.align="center"}
+pdf("bigram_network.pdf") 
+
+V(bigram_network)$degree <- degree(graph = bigram_network)
+
+E(bigram_network)$width <- E(bigram_network)$n/max(E(bigram_network)$n)
+
+plot(
+  bigram_network, 
+  vertex.size = 0.3*V(bigram_network)$degree,
+  vertex.color = "lightblue",
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.3, 
+  vertex.label.dist = 0.2,
+  edge.color = "gray", 
+  edge.width = 1*E(bigram_network)$width,
+  main = "Bigram Count Network",
+  alpha = 50, 
+  layout = layout_with_fr(bigram_network), 
+)
+
+dev.off() 
+```
+
 
 
