@@ -35,4 +35,10 @@ raw_df <- rtweet::search_tweets(
 # Save as .rds format. 
 # This is needed because the data comes as a nested dataframe with
 # columns of type list. 
-saveRDS(object = raw_df, file = "24_11_2019_twitter_21n.rds")
+saveRDS(object = raw_df, file = "data/24_11_2019_twitter_21n.rds")
+
+# Save as json.
+jsonlite::write_json(
+  x =  raw_df,
+  path = "data/24_11_2019_twitter_21n.json"
+)
