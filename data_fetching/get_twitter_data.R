@@ -14,7 +14,10 @@ twitter_terms <- c(
   "#100RazonesParaNoMarchar", 
   "#YoNoParo",
   "#YoParoEl21NSinMiedo", 
-  "#Cacerolazo"
+  "#Cacerolazo", 
+  "#22N", 
+  "#23N",
+  "#ToqueDeQueda"
 )
 
 twitter_query <- stringr::str_c(twitter_terms, collapse = " OR ")
