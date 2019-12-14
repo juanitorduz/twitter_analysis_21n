@@ -1,0 +1,419 @@
+---
+title: "EDA on second Data Pull (24-11-2019)"
+---
+
+## Prepare Notebook
+
+```{r}
+library(igraph)
+library(magrittr)
+library(lubridate)
+library(networkD3)
+library(tidytext)
+library(tidyverse)
+library(tm)
+library(widyr)
+library(wordcloud)
+```
+
+## Read Data
+
+```{r}
+raw_df <- readRDS(file = "../data/25_11_2019_twitter_21n.rds")
+```
+
+## EDA
+
+Let us get a glimpse on the data. 
+
+```{r}
+glimpse(raw_df)
+```
+
+### Languages
+
+**Warning:** We have tweets in japanese and arabic. We might be able to remove them using the `lang` feature. 
+
+```{r}
+raw_df %>% 
+  filter(is.na(lang)) %>% 
+  nrow()
+```
+
+```{r, fig.align="center"}
+raw_df %>% 
+  group_by(lang) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(lang = reorder(lang, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle(label = "Language Count")
+```
+
+Spanish is by far the most used language. 
+
+### Timeframe 
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour, is_retweet) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+We do not see a big increase in organic tweets. 
+
+### Location
+
+```{r, fig.align="center"}
+raw_df %>% 
+  mutate(location = case_when(location == "" ~ "no-tag", TRUE ~ str_to_lower(location))) %>% 
+  group_by(location) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(n = n /sum(n)) %>% 
+  arrange(- n) %>% 
+  head(20) %>% 
+  mutate(lang = reorder(location, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle(label = "Location Count")
+```
+
+### Hashtags
+
+```{r}
+hashtags_vect <- raw_df %>% 
+  filter(! is.na(hashtags)) %>% 
+  pull(hashtags) %>% 
+  unlist()
+
+hashtags_df <- tibble(hashtag = hashtags_vect) %>% 
+  mutate(hashtag = str_to_lower(string = hashtag)) %>% 
+  count(hashtag) %>% 
+  arrange(-n)
+```
+
+```{r, fig.height=8}
+hashtags_df %>% mutate(n = n /sum(n)) %>% 
+  top_n(n = 50, wt = n) %>% 
+  mutate(hashtag = reorder(hashtag, n)) %>%
+  ggplot(aes(x = hashtag, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = 'Hashtag Count')
+```
+
+```{r, fig.width=8, fig.align="center"}
+wordcloud(
+  words = hashtags_df$hashtag, 
+  freq = hashtags_df$n, 
+  min.freq = 200, 
+  colors = brewer.pal(8, "Dark2"))
+
+```
+
+### Top - Tweets
+
+```{r, fig.height=8}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  group_by(screen_name) %>% 
+  summarise(retweet_count = sum(retweet_count)) %>% 
+  ungroup() %>% 
+  arrange(- retweet_count) %>% 
+  head(50) %>% 
+  mutate(screen_name = reorder(screen_name, retweet_count)) %>%
+  ggplot(aes(x = screen_name, y = retweet_count)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = 'Top Retweeted Users')
+```
+
+
+```{r}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  select(screen_name, text, retweet_count) %>% 
+  arrange(- retweet_count)
+```
+
+
+### Retweet Network 
+
+Let us define a retweet weighted directed network as follows:
+
+- Nodes: 
+  - Source = `screen_name` 
+  - Target = `retweet_screen_name`
+  
+- Edges: Two nodes are conected if there is at least `threshold` number of retweets. 
+
+- Weight: number of retweets. 
+
+For visualization purposes: Let `threshold` > 0. We can filter edges which have weight less than `threshold`. 
+
+First, we construct a data frame. 
+
+```{r}
+# Construct retweet network. 
+retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name)
+```
+
+We now construct the network from the dataframe above. 
+
+```{r}
+retweets_graph <- graph_from_data_frame(d = retweets_df, directed = TRUE)
+```
+
+
+```{r}
+# We compute the in/out weighted degree for the retweet graph. 
+compute_weighted_deg_df <- function (retweets_graph) {
+  
+  retweets_node_df <- tibble(
+    screen_name = V(retweets_graph)$name
+  )
+  
+  tweets_out_df <- retweets_df %>% 
+    select(screen_name, n) %>% 
+    group_by(screen_name) %>% 
+    summarise(tweets_out = sum(n))
+  
+  tweets_in_df <- retweets_df %>%
+    select(retweet_screen_name, n) %>% 
+    group_by(retweet_screen_name) %>% 
+    summarise(tweets_in = sum(n))
+  
+  retweets_node_df %<>% 
+    left_join(y = tweets_out_df, by = c("screen_name")) %>% 
+    left_join(y = tweets_in_df, by = c("screen_name" = "retweet_screen_name")) %>% 
+    replace_na(list(tweets_in = 0, tweets_out = 0))
+  
+  return(retweets_node_df)
+}
+
+retweets_node_df <- compute_weighted_deg_df(retweets_graph)
+```
+
+```{r}
+retweets_node_df %>% arrange(- tweets_in)
+```
+
+We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most. 
+
+```{r}
+retweets_node_df %>% arrange(- tweets_in)
+```
+
+Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+
+```{r}
+retweets_node_df %>% arrange(- tweets_out)
+```
+
+```{r}
+V(retweets_graph)$tweets_in <- retweets_node_df$tweets_in
+V(retweets_graph)$tweets_out <- retweets_node_df$tweets_out
+```
+
+
+- Visualization
+
+```{r}
+# Set weight threshold. 
+threshold <- 4
+
+red_retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name) %>% 
+  filter(n >= threshold)
+
+red_retweets_graph <- graph_from_data_frame(d = red_retweets_df, directed = TRUE)
+
+red_retweets_node_df <- compute_weighted_deg_df(red_retweets_graph)
+
+V(red_retweets_graph)$tweets_in <- red_retweets_node_df$tweets_in
+V(red_retweets_graph)$tweets_out <- red_retweets_node_df$tweets_out
+```
+
+```{r}
+# Compute the weight shares.
+E(red_retweets_graph)$width <- E(red_retweets_graph)$n/max(E(red_retweets_graph)$n)
+
+# Create networkD3 object.
+network_d3 <- igraph_to_networkD3(g = red_retweets_graph)
+# Define node size.
+network_d3$nodes %<>% mutate(Degree = 0.01*V(red_retweets_graph)$tweets_in)
+# Degine color group (I will explore this feature later).
+network_d3$nodes %<>% mutate(Group = 1)
+# Define edges width. 
+network_d3$links$Width <- 10*E(red_retweets_graph)$width
+
+network_d3_viz <- forceNetwork(
+  Links = network_d3$links, 
+  Nodes = network_d3$nodes, 
+  arrows = TRUE,
+  Source = 'source', 
+  Target = 'target',
+  NodeID = 'name',
+  Group = 'Group', 
+  opacity = 0.9,
+  Value = 'Width',
+  Nodesize = 'Degree', 
+  # We input a JavaScript function.
+  linkWidth = JS("function(d) { return Math.sqrt(d.value); }"), 
+  fontSize = 12,
+  zoom = TRUE, 
+  opacityNoHover = 1, 
+)
+
+saveNetwork(
+  network = network_d3_viz, 
+  file = paste0(getwd(), "/eda_second_data_pull_output/retweet_network.html"), 
+  selfcontained = TRUE
+)
+```
+
+### Text Analysis
+
+- Text Cleaning
+
+```{r}
+tweets_corpus <- VCorpus(
+  VectorSource(
+    raw_df %>% 
+      filter(lang == "es") %>% 
+      mutate(text = str_to_lower(text)) %>% 
+      pull(text)
+  )
+)
+```
+
+```{r}
+rm_pattern <- content_transformer( 
+  function (x, pattern) str_remove_all(string = x, pattern = pattern)
+)
+
+url_pattern <- " ?(f|ht)(tp)(s?):(//)?\\S+"
+
+clean_tweets_corpus <- tweets_corpus %>% 
+  tm_map(rm_pattern, "/") %>% 
+  tm_map(rm_pattern, "\\|") %>% 
+  tm_map(rm_pattern, url_pattern) %>% 
+  tm_map(stripWhitespace) %>% 
+  tm_map(PlainTextDocument)
+
+clean_tweets_df <- tibble(
+  clean_text = sapply(X = clean_tweets_corpus, FUN = function(x) x$content)
+)
+```
+
+```{r}
+clean_tweets_df %>% head(100)
+```
+
+- Word Count
+
+```{r}
+stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
+
+words_df <- clean_tweets_df %>% 
+  unnest_tokens(output = word, input = clean_text) %>% 
+  anti_join(y = stopwords_df, by = "word")
+
+word_count <- words_df %>% 
+  count(word) %>% 
+  arrange(- n)
+```
+
+```{r, fig.height=8}
+word_count %>% 
+  head(50) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Word Count")
+```
+
+
+```{r, fig.width=8, fig.align="center"}
+wordcloud(
+  words = word_count$word, 
+  freq = word_count$n, 
+  min.freq = 2500, 
+  colors = brewer.pal(8, "Dark2"))
+```
+
+- 2-Gram Network
+
+```{r}
+bigram_count <- clean_tweets_df %>% 
+  unnest_tokens(input = clean_text, output = bigram, token = "ngrams", n = 2) %>% 
+  separate(col = bigram, into = c("word1", "word2"), sep = " ") %>% 
+  filter(! word1 %in% stopwords_df$word) %>% 
+  filter(! word2 %in% stopwords_df$word) %>% 
+  filter(! is.na(word1)) %>% 
+  filter(! is.na(word2)) %>% 
+  count(word1, word2, sort = TRUE)
+  
+```
+
+```{r}
+bigram_threshold <- 1000
+
+bigram_network <- bigram_count %>%
+  filter(n > bigram_threshold) %>%
+  graph_from_data_frame(directed = FALSE)
+```
+
+```{r, fig.width=10, fig.height=10,  fig.align="center"}
+pdf(paste0(getwd(),"/eda_second_data_pull_output/bigram_network.pdf")) 
+
+V(bigram_network)$degree <- degree(graph = bigram_network)
+
+E(bigram_network)$width <- E(bigram_network)$n/max(E(bigram_network)$n)
+
+plot(
+  bigram_network, 
+  vertex.size = 0.3*V(bigram_network)$degree,
+  vertex.color = "lightblue",
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.3, 
+  vertex.label.dist = 0.2,
+  edge.color = "gray", 
+  edge.width = 1*E(bigram_network)$width,
+  main = "Bigram Count Network",
+  alpha = 50, 
+  layout = layout_with_fr(bigram_network), 
+)
+
+dev.off() 
+```
+
+
+
