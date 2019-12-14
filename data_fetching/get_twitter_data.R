@@ -2,6 +2,7 @@
 twitter_terms <- c(
   "21N", 
   "#21N", 
+  "#21NSomosTodos",
   "#Paro21N", 
   "#YoMarchoEste21",
   "#YoMarchoEl21",
@@ -12,16 +13,18 @@ twitter_terms <- c(
   "#100RazonesParaMarchar", 
   "#100RazonesParaNoMarchar", 
   "#YoNoParo",
-  "#YoParoEl21NSinMiedo"
+  "#YoParoEl21NSinMiedo", 
+  "#Cacerolazo", 
+  "#22N", 
+  "#23N",
+  "#ToqueDeQueda"
 )
 
 twitter_query <- stringr::str_c(twitter_terms, collapse = " OR ")
 
-# Fetch data usinng rtweet. 
-
 raw_df <- rtweet::search_tweets(
   q = twitter_query, 
-  n = 2E5, 
+  n = 1E6, 
   type = "recent", 
   include_rts = TRUE, 
   parse = TRUE, 
@@ -32,4 +35,10 @@ raw_df <- rtweet::search_tweets(
 # Save as .rds format. 
 # This is needed because the data comes as a nested dataframe with
 # columns of type list. 
-# saveRDS(object = raw_df, file = "19_11_2019_twitter_21n.rds")
+saveRDS(object = raw_df, file = "data/25_11_2019_twitter_21n.rds")
+
+# Save as json.
+jsonlite::write_json(
+  x =  raw_df,
+  path = "data/25_11_2019_twitter_21n.json"
+)
