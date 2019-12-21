@@ -1,0 +1,10 @@
+Abstract for European R conference:
+https://2020.erum.io/
+
+We want to present a regular talk:
+
+Regular talk (20 minutes): abstracts accepted for regular talks will take place during oral sessions. Each talk is allowed 20 minutes for the presentation (including questions and answers).
+
+Under the following track:
+R Applications: Applications of R in fields such as social goods, finance, marketing, transportation, and many more. 
+
