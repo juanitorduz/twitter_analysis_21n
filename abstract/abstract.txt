@@ -11,4 +11,13 @@ R Applications: Applications of R in fields such as social goods, finance, marke
 
 Abstract:
 
-We are going to explore a subset of the data using a relational event model. A relational event sequence is an order- or time-stamped series of observations indicating when an actor carried out a specific action, or interacted with another actor. The occurrence of events is modelled using standard survival analysis techniques but where the past relational history is considered when defining the probability of an specific event happening in the future. 
+In 2019 various Latin-American countries faced protests and strikes against many historical problems including corruption, low education invests and huge economic inequality. In particular, at the end of November 2019 Colombia faced a very intense week of protests were many types of events occurred such as a spontaneous “cacerolazo” (translation?) and a spread of fake news around violence and threads in Bogota and Cali. Most of these events were originated and resonated in social media.  To try to understand these events and relevant agents (politicians, media, journalists, artists, etc) we pulled data from twitter’s API using the rtweet R package and extracted around one million tweets from 20th-24th of November 2019 associated with the protest (via relevant keywords and hahstags). In this talk we will present an analysis of this data focusing in the following aspects: 
+
+  - Network analysis of agents via retweets and engagement networks. 
+  - Text analysis and topic development during the strike. 
+
+In addition, we will explore a relational event model. A relational event sequence is an order- or time-stamped series of observations indicating when an actor carried out a specific action, or interacted with another actor. The occurrence of events is modelled using standard survival analysis techniques but where the past relational history is considered when defining the probability of an specific event happening in the future. In the cotext of the Colombian protets we seek to understand ... (complete)
+
+Authors: 
+- Sebastian Martinez, PhD candidate School of Mathematics and Statistics, University of Glasgow. 
+- Dr. Juan Orduz, Mathematician & Data Scientist. 
