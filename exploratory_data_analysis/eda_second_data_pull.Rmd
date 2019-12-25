@@ -56,9 +56,17 @@ Spanish is by far the most used language.
 
 ### Timeframe 
 
+Let us see the number of tweets over time. 
+
+First, note that the `created_at` feature refers to UTC time. We need to substract 5 hours to get Colombian time. 
+```{r}
+raw_df$created_at[1] - (5*3600)
+```
+
+
 ```{r}
 raw_df %>% 
-  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
   group_by(created_at_round_hour) %>% 
   count() %>% 
   ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
@@ -66,17 +74,28 @@ raw_df %>%
   ggtitle(label = "Number of Tweets (All) per Hour")
 ```
 
+There is a remarkable high peack 
+
 ```{r}
 raw_df %>% 
-  mutate(created_at_round_hour = created_at %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  arrange(-n) %>% 
+  head(10)
+```
+
+The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this: cacerolazo and the media spread on chaos in Bogota and Cali. We need to understand this better. 
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
   group_by(created_at_round_hour, is_retweet) %>% 
   count() %>% 
   ggplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
   geom_line() +
   ggtitle(label = "Number of Tweets (All) per Hour")
 ```
-
-We do not see a big increase in organic tweets. 
 
 ### Location
 
@@ -110,9 +129,9 @@ hashtags_df <- tibble(hashtag = hashtags_vect) %>%
   arrange(-n)
 ```
 
-```{r, fig.height=8}
+```{r}
 hashtags_df %>% mutate(n = n /sum(n)) %>% 
-  top_n(n = 50, wt = n) %>% 
+  top_n(n = 30, wt = n) %>% 
   mutate(hashtag = reorder(hashtag, n)) %>%
   ggplot(aes(x = hashtag, y = n)) +
   geom_col() +
@@ -121,25 +140,27 @@ hashtags_df %>% mutate(n = n /sum(n)) %>%
   ggtitle(label = 'Hashtag Count')
 ```
 
-```{r, fig.width=8, fig.align="center"}
+```{r}
 wordcloud(
   words = hashtags_df$hashtag, 
   freq = hashtags_df$n, 
-  min.freq = 200, 
+  min.freq = 500, 
   colors = brewer.pal(8, "Dark2"))
 
 ```
 
 ### Top - Tweets
 
-```{r, fig.height=8}
+Top (direct) retweeted people:
+
+```{r}
 raw_df %>% 
   filter(is_retweet == FALSE) %>% 
   group_by(screen_name) %>% 
   summarise(retweet_count = sum(retweet_count)) %>% 
   ungroup() %>% 
   arrange(- retweet_count) %>% 
-  head(50) %>% 
+  head(30) %>% 
   mutate(screen_name = reorder(screen_name, retweet_count)) %>%
   ggplot(aes(x = screen_name, y = retweet_count)) +
   geom_col() +
@@ -148,12 +169,14 @@ raw_df %>%
   ggtitle(label = 'Top Retweeted Users')
 ```
 
+Let us get the text of the most retweeted mentions:
 
 ```{r}
 raw_df %>% 
   filter(is_retweet == FALSE) %>% 
   select(screen_name, text, retweet_count) %>% 
-  arrange(- retweet_count)
+  arrange(- retweet_count) %>% 
+  head(10)
 ```
 
 
@@ -243,7 +266,7 @@ V(retweets_graph)$tweets_out <- retweets_node_df$tweets_out
 
 ```{r}
 # Set weight threshold. 
-threshold <- 4
+threshold <- 13
 
 red_retweets_df <- raw_df %>% 
   filter(is_retweet == TRUE) %>% 
@@ -349,9 +372,9 @@ word_count <- words_df %>%
   arrange(- n)
 ```
 
-```{r, fig.height=8}
+```{r}
 word_count %>% 
-  head(50) %>%
+  head(30) %>%
   mutate(word = reorder(word, n)) %>%
   ggplot(aes(word, n)) +
   geom_col() +
@@ -384,7 +407,7 @@ bigram_count <- clean_tweets_df %>%
 ```
 
 ```{r}
-bigram_threshold <- 1000
+bigram_threshold <- 3500
 
 bigram_network <- bigram_count %>%
   filter(n > bigram_threshold) %>%
