@@ -519,7 +519,7 @@ bigram_count <- clean_tweets_df %>%
 ```
 
 ```{r}
-bigram_threshold <- 3500
+bigram_threshold <- 4500
 
 bigram_network <- bigram_count %>%
   filter(n > bigram_threshold) %>%
@@ -550,5 +550,83 @@ plot(
 dev.off() 
 ```
 
+- Skipgram Network
 
+```{r}
+skip_window <- 2
+
+skipgram_words <- clean_tweets_df %>% 
+  unnest_tokens(
+    input = clean_text, 
+    output = skipgram, 
+    token = "skip_ngrams", 
+    n = skip_window
+  ) %>% 
+  filter(! is.na(skipgram))
+```
+
+```{r}
+skipgram_words$num_words <- skipgram_words$skipgram %>% 
+  map_int(.f = ~ ngram::wordcount(.x))
+
+skipgram_words %<>% 
+  filter(num_words == 2) %>% 
+  select(- num_words)
+
+skipgram_words %<>% 
+  separate(col = skipgram, into = c("word1", "word2"), sep = " ") %>% 
+  filter(! word1 %in% stopwords_df$word) %>% 
+  filter(! word2 %in% stopwords_df$word) %>% 
+  filter(! is.na(word1)) %>% 
+  filter(! is.na(word2)) 
+
+skipgram_count <- skipgram_words  %>% 
+  count(word1, word2, sort = TRUE)
+
+skipgram_count %<>% 
+  mutate(
+    word_minus = case_when(
+      (word1 <= word2) ~ word1, 
+      (word1 > word2) ~ word2
+    ),
+    word_plus = case_when(
+      (word1 <= word2) ~ word2, 
+      (word1 > word2) ~ word1
+    )
+  ) %>% 
+  group_by(word_minus, word_plus) %>% 
+  summarise(n = sum(n))
+```
+
+```{r}
+skipgram_threshold <- 10000
+
+skipgram_network <- skipgram_count %>%
+  filter(n > skipgram_threshold) %>%
+  graph_from_data_frame(directed = FALSE)
+```
+
+```{r, fig.width=10, fig.height=10,  fig.align="center"}
+pdf(paste0(getwd(),"/eda_second_data_pull_output/skipgram_network.pdf")) 
+
+V(skipgram_network)$degree <- degree(graph = skipgram_network)
+
+E(skipgram_network)$width <- E(skipgram_network)$n/max(E(skipgram_network)$n)
+
+plot(
+  bigram_network, 
+  vertex.size = 0.3*V(skipgram_network)$degree,
+  vertex.color = "lightblue",
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.3, 
+  vertex.label.dist = 0.2,
+  edge.color = "gray", 
+  edge.width = 1*E(skipgram_network)$width,
+  main = "Bigram Count Network",
+  alpha = 50, 
+  layout = layout_with_fr(skipgram_network), 
+)
+
+dev.off() 
+```
 
