@@ -115,6 +115,16 @@ raw_df %>%
   ggtitle(label = "Location Count")
 ```
 
+### Verified Account
+
+```{r}
+raw_df %>% 
+  count(verified) %>% 
+  ggplot(mapping = aes(x = verified, y = n, fill = verified)) +
+  geom_col()
+```
+
+
 ### Hashtags
 
 ```{r}
@@ -149,6 +159,109 @@ wordcloud(
 
 ```
 
+Let us plot the time development of certain specific keywords: 
+
+- `#cacerolazo`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = hashtags, pattern = "cacerolazo")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with #cacerolazo")
+```
+
+- `#toquedequeda`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = hashtags, pattern = "toquedequeda")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with #toquedequeda")
+```
+
+- `esmad`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "esmad")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: esmad")
+```
+
+- `miedo`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "miedo")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: miedo")
+```
+
+- `violencia`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "violencia")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: violencia")
+```
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "vándalos")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: vándalos")
+```
+
+### Favorite Count
+
+```{r}
+raw_df %>% 
+  group_by(screen_name) %>% 
+  summarise(favorite_count  = sum(favorite_count)) %>% 
+  ungroup() %>% 
+  arrange(- favorite_count ) %>% 
+  head(30) %>% 
+  mutate(screen_name = reorder(screen_name, favorite_count)) %>%
+  ggplot(aes(x = screen_name, y = favorite_count)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Top Favorite Count")
+```
+
+Let us get the text of the most favorite mentions:
+
+```{r}
+raw_df %>% 
+  select(screen_name, text, favorite_count) %>% 
+  arrange(- favorite_count) %>% 
+  head(10)
+```
+
 ### Top - Tweets
 
 Top (direct) retweeted people:
@@ -166,7 +279,7 @@ raw_df %>%
   geom_col() +
   xlab(NULL) +
   coord_flip() +
-  ggtitle(label = 'Top Retweeted Users')
+  ggtitle(label = "Top Retweeted Users")
 ```
 
 Let us get the text of the most retweeted mentions:
@@ -178,7 +291,6 @@ raw_df %>%
   arrange(- retweet_count) %>% 
   head(10)
 ```
-
 
 ### Retweet Network 
 
@@ -266,7 +378,7 @@ V(retweets_graph)$tweets_out <- retweets_node_df$tweets_out
 
 ```{r}
 # Set weight threshold. 
-threshold <- 13
+threshold <- 11
 
 red_retweets_df <- raw_df %>% 
   filter(is_retweet == TRUE) %>% 
@@ -289,7 +401,7 @@ E(red_retweets_graph)$width <- E(red_retweets_graph)$n/max(E(red_retweets_graph)
 # Create networkD3 object.
 network_d3 <- igraph_to_networkD3(g = red_retweets_graph)
 # Define node size.
-network_d3$nodes %<>% mutate(Degree = 0.01*V(red_retweets_graph)$tweets_in)
+network_d3$nodes %<>% mutate(Degree = (1/400)*V(red_retweets_graph)$tweets_in)
 # Degine color group (I will explore this feature later).
 network_d3$nodes %<>% mutate(Group = 1)
 # Define edges width. 
@@ -299,13 +411,13 @@ network_d3_viz <- forceNetwork(
   Links = network_d3$links, 
   Nodes = network_d3$nodes, 
   arrows = TRUE,
-  Source = 'source', 
-  Target = 'target',
-  NodeID = 'name',
-  Group = 'Group', 
+  Source = "source", 
+  Target = "target",
+  NodeID = "name",
+  Group = "Group", 
   opacity = 0.9,
-  Value = 'Width',
-  Nodesize = 'Degree', 
+  Value = "Width",
+  Nodesize = "Degree", 
   # We input a JavaScript function.
   linkWidth = JS("function(d) { return Math.sqrt(d.value); }"), 
   fontSize = 12,
