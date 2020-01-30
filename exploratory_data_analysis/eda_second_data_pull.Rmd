@@ -313,7 +313,8 @@ First, we construct a data frame.
 retweets_df <- raw_df %>% 
   filter(is_retweet == TRUE) %>% 
   select(screen_name, retweet_screen_name) %>% 
-  count(screen_name, retweet_screen_name)
+  count(screen_name, retweet_screen_name) %>% 
+  rename(weight = n)
 ```
 
 We now construct the network from the dataframe above. 
@@ -322,57 +323,31 @@ We now construct the network from the dataframe above.
 retweets_graph <- graph_from_data_frame(d = retweets_df, directed = TRUE)
 ```
 
-
 ```{r}
-# We compute the in/out weighted degree for the retweet graph. 
-compute_weighted_deg_df <- function (retweets_graph) {
-  
-  retweets_node_df <- tibble(
-    screen_name = V(retweets_graph)$name
-  )
-  
-  tweets_out_df <- retweets_df %>% 
-    select(screen_name, n) %>% 
-    group_by(screen_name) %>% 
-    summarise(tweets_out = sum(n))
-  
-  tweets_in_df <- retweets_df %>%
-    select(retweet_screen_name, n) %>% 
-    group_by(retweet_screen_name) %>% 
-    summarise(tweets_in = sum(n))
-  
-  retweets_node_df %<>% 
-    left_join(y = tweets_out_df, by = c("screen_name")) %>% 
-    left_join(y = tweets_in_df, by = c("screen_name" = "retweet_screen_name")) %>% 
-    replace_na(list(tweets_in = 0, tweets_out = 0))
-  
-  return(retweets_node_df)
-}
-
-retweets_node_df <- compute_weighted_deg_df(retweets_graph)
+# Verify we have a weighted directed graph. 
+is.directed(retweets_graph) & is.directed(retweets_graph)
 ```
 
 ```{r}
-retweets_node_df %>% arrange(- tweets_in)
-```
+# We compute in/out degree for each node.  
+V(retweets_graph)$tweets_in <- strength(graph = retweets_graph, mode = "in")
+V(retweets_graph)$tweets_out <- strength(graph = retweets_graph, mode = "out")
 
-We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most. 
-
-```{r}
-retweets_node_df %>% arrange(- tweets_in)
-```
-
-Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
-
-```{r}
-retweets_node_df %>% arrange(- tweets_out)
+retweets_deg_df <- tibble(
+  screen_name = V(retweets_graph)$name, 
+  tweets_in = V(retweets_graph)$tweets_in,
+  tweets_out = V(retweets_graph)$tweets_out
+)
 ```
 
 ```{r}
-V(retweets_graph)$tweets_in <- retweets_node_df$tweets_in
-V(retweets_graph)$tweets_out <- retweets_node_df$tweets_out
+#We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most
+retweets_deg_df %>% arrange(- tweets_in) %>% head(10)
 ```
-
+```{r}
+# Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+retweets_deg_df %>% arrange(- tweets_out)
+```
 
 - Visualization
 
@@ -384,19 +359,19 @@ red_retweets_df <- raw_df %>%
   filter(is_retweet == TRUE) %>% 
   select(screen_name, retweet_screen_name) %>% 
   count(screen_name, retweet_screen_name) %>% 
-  filter(n >= threshold)
+  rename(weight = n) %>% 
+  filter(weight >= threshold)
 
 red_retweets_graph <- graph_from_data_frame(d = red_retweets_df, directed = TRUE)
 
-red_retweets_node_df <- compute_weighted_deg_df(red_retweets_graph)
-
-V(red_retweets_graph)$tweets_in <- red_retweets_node_df$tweets_in
-V(red_retweets_graph)$tweets_out <- red_retweets_node_df$tweets_out
+# We compute in/out degree for each node.  
+V(red_retweets_graph)$tweets_in <- strength(graph = red_retweets_graph, mode = "in")
+V(red_retweets_graph)$tweets_out <- strength(graph = red_retweets_graph, mode = "out")
 ```
 
 ```{r}
 # Compute the weight shares.
-E(red_retweets_graph)$width <- E(red_retweets_graph)$n/max(E(red_retweets_graph)$n)
+E(red_retweets_graph)$width <- E(red_retweets_graph)$weight/max(E(red_retweets_graph)$weight)
 
 # Create networkD3 object.
 network_d3 <- igraph_to_networkD3(g = red_retweets_graph)
@@ -427,7 +402,7 @@ network_d3_viz <- forceNetwork(
 
 saveNetwork(
   network = network_d3_viz, 
-  file = paste0(getwd(), "/eda_second_data_pull_output/retweet_network.html"), 
+  file = "retweet_network.html", 
   selfcontained = TRUE
 )
 ```
@@ -542,7 +517,7 @@ bigram_network <- bigram_count %>%
 ```
 
 ```{r, fig.width=10, fig.height=10,  fig.align="center"}
-pdf(paste0(getwd(),"/eda_second_data_pull_output/bigram_network.pdf")) 
+pdf("bigram_network.pdf")
 
 V(bigram_network)$degree <- strength(graph = bigram_network)
 
@@ -625,7 +600,7 @@ skipgram_network <- skipgram_count %>%
 ```
 
 ```{r, fig.width=10, fig.height=10,  fig.align="center"}
-pdf(paste0(getwd(),"/eda_second_data_pull_output/skipgram_network.pdf")) 
+pdf("skipgram_network.pdf") 
 
 V(skipgram_network)$degree <- strength(graph = skipgram_network)
 
