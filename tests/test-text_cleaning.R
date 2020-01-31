@@ -12,5 +12,3 @@ test_that(desc = "Clean Tweet Text", code = {
   expect_equal(clean_text_3, "")
   expect_equal(clean_text_4, "elguay")
 })
-
-
