@@ -8,6 +8,8 @@ trim_both <- tm::content_transformer(
   function (x) stringr::str_trim(string = x, side = "both")
 )
 
+
+
 clean_tweets <- function(tweet_text) {
   
   tweet_text_lwr <- stringr::str_to_lower(tweet_text)
@@ -20,7 +22,8 @@ clean_tweets <- function(tweet_text) {
     tm::tm_map(rm_pattern, "/") %>% 
     tm::tm_map(rm_pattern, "\\|") %>% 
     tm::tm_map(rm_pattern, url_pattern) %>% 
-    tm::tm_map(tm::removePunctuation) %>% 
+    tm::tm_map(rm_pattern, "[^#[:^punct:]]+") %>% 
+    tm::tm_map(rm_pattern, "\\+") %>% 
     tm::tm_map(trim_both)
   
     clean_tweet_text <- sapply(
