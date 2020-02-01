@@ -26,28 +26,54 @@ source(file = "../R/text_cleaning.R")
 ## Read Data
 
 ```{r, read data}
-clean_text_tweets_df <- readRDS(file = "../data/clean_text_tweets.rds")
-hashtags_df <- readRDS(file = "../data/hashtags.rds")
+#clean_text_tweets_df <- readRDS(file = "../data/clean_text_tweets.rds")
+hashtags_count_df <- readRDS(file = "../data/hashtags_count.rds")
 ```
 
 ## Hashtags
 
-Let us see the top hastags used:
+In the data gathering phase we tracked the following hashtags:
+
+```{r}
+twitter_terms <- c(
+  "21N", 
+  "#21N", 
+  "#21NSomosTodos",
+  "#Paro21N", 
+  "#YoMarchoEste21",
+  "#YoMarchoEl21",
+  "#YoNoMarchoEste21",
+  "#YoNoMarchoEl21",
+  "#RazonesParaMarchar",
+  "#RazonesParaNoMarchar",
+  "#100RazonesParaMarchar", 
+  "#100RazonesParaNoMarchar", 
+  "#YoNoParo",
+  "#YoParoEl21NSinMiedo", 
+  "#Cacerolazo", 
+  "#22N", 
+  "#23N",
+  "#ToqueDeQueda"
+)
+```
+
+Let us see the top hastags appearing ini the data:
 
 ```{r, fig.align="center"}
-hashtag_count_df <- get_hashtag_count_df(hashtags_df = hashtags_df, to_lower = TRUE)
+normalized_twitter_terms <- twitter_terms %>% 
+  str_to_lower() %>% 
+  str_remove_all(pattern = "#")
 
-hashtag_count_df %>% 
+hashtags_count_df %>% 
+  mutate(is_tracked = hashtag %in% normalized_twitter_terms) %>% 
   mutate(n = n /sum(n)) %>% 
   top_n(n = 30, wt = n) %>% 
-  mutate(hashtags = reorder(hashtags, n)) %>%
-  ggplot(aes(x = hashtags, y = n)) +
-  newtheme +
-  geom_col(fill = set_1_palette[2]) +
+  mutate(hashtag = reorder(hashtag, n)) %>%
+  ggmyplot(aes(x = hashtag, y = n, fill = is_tracked)) +
+  geom_col() +
   xlab(NULL) +
   coord_flip() +
 ggtitle(label = "Hashtag Count (Share)") 
-
-
 ```
+
 
