@@ -1,13 +1,14 @@
 library(magrittr)
 
+
 rm_pattern <- tm::content_transformer( 
   function (x, pattern) stringr::str_remove_all(string = x, pattern = pattern)
 )
 
+
 trim_both <- tm::content_transformer( 
   function (x) stringr::str_trim(string = x, side = "both")
 )
-
 
 
 clean_tweets <- function(tweet_text) {
@@ -34,4 +35,10 @@ clean_tweets <- function(tweet_text) {
     clean_tweet_text <- as.vector(clean_tweet_text)
     
   return(clean_tweet_text)
+}
+
+
+rm_hashtags <- function(x) {
+  x_no_hashtags <- stringr::str_remove_all(string = x, pattern = "#\\S+")
+  return(x_no_hashtags)
 }
