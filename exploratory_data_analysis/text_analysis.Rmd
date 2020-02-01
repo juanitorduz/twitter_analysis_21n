@@ -1,0 +1,53 @@
+---
+title: "Text Analysis Notebook"
+---
+
+In this notebook we analyse the content of the tweets. We want to understand which are the main topics discussed and their corresponding development over time. 
+
+## Prepare Notebook
+
+```{r, warning=FALSE,  message=FALSE}
+knitr::opts_knit$set(warning=FALSE, message=FALSE)
+
+library(igraph)
+library(magrittr)
+library(lubridate)
+library(tidytext)
+library(tidyverse)
+library(tm)
+library(widyr)
+library(wordcloud)
+
+source(file = "../R/hashtags.R")
+source(file = "../R/newtheme.R")
+source(file = "../R/text_cleaning.R")
+```
+
+## Read Data
+
+```{r, read data}
+clean_text_tweets_df <- readRDS(file = "../data/clean_text_tweets.rds")
+hashtags_df <- readRDS(file = "../data/hashtags.rds")
+```
+
+## Hashtags
+
+Let us see the top hastags used:
+
+```{r, fig.align="center"}
+hashtag_count_df <- get_hashtag_count_df(hashtags_df = hashtags_df, to_lower = TRUE)
+
+hashtag_count_df %>% 
+  mutate(n = n /sum(n)) %>% 
+  top_n(n = 30, wt = n) %>% 
+  mutate(hashtags = reorder(hashtags, n)) %>%
+  ggplot(aes(x = hashtags, y = n)) +
+  newtheme +
+  geom_col(fill = set_1_palette[2]) +
+  xlab(NULL) +
+  coord_flip() +
+ggtitle(label = "Hashtag Count (Share)") 
+
+
+```
+
