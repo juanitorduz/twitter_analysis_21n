@@ -1,0 +1,625 @@
+---
+title: "EDA on second Data Pull (24-11-2019)"
+---
+
+## Prepare Notebook
+
+```{r}
+library(igraph)
+library(magrittr)
+library(lubridate)
+library(networkD3)
+library(tidytext)
+library(tidyverse)
+library(tm)
+library(widyr)
+library(wordcloud)
+```
+
+## Read Data
+
+```{r}
+raw_df <- readRDS(file = "../data/25_11_2019_twitter_21n.rds")
+```
+
+## EDA
+
+Let us get a glimpse on the data. 
+
+```{r}
+glimpse(raw_df)
+```
+
+### Languages
+
+**Warning:** We have tweets in japanese and arabic. We might be able to remove them using the `lang` feature. 
+
+```{r}
+raw_df %>% 
+  filter(is.na(lang)) %>% 
+  nrow()
+```
+
+```{r, fig.align="center"}
+raw_df %>% 
+  group_by(lang) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(lang = reorder(lang, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle(label = "Language Count")
+```
+
+Spanish is by far the most used language. 
+
+### Timeframe 
+
+Let us see the number of tweets over time. 
+
+First, note that the `created_at` feature refers to UTC time. We need to substract 5 hours to get Colombian time. 
+```{r}
+raw_df$created_at[1] - (5*3600)
+```
+
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+There is a remarkable high peack 
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  arrange(-n) %>% 
+  head(10)
+```
+
+The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this: cacerolazo and the media spread on chaos in Bogota and Cali. We need to understand this better. 
+
+```{r}
+raw_df %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour, is_retweet) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour")
+```
+
+### Location
+
+```{r, fig.align="center"}
+raw_df %>% 
+  mutate(location = case_when(location == "" ~ "no-tag", TRUE ~ str_to_lower(location))) %>% 
+  group_by(location) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(n = n /sum(n)) %>% 
+  arrange(- n) %>% 
+  head(20) %>% 
+  mutate(lang = reorder(location, n)) %>%  
+  ggplot(mapping = aes(x = lang, y = n)) +
+  geom_col() +
+  coord_flip() +
+  ggtitle(label = "Location Count")
+```
+
+### Verified Account
+
+```{r}
+raw_df %>% 
+  count(verified) %>% 
+  ggplot(mapping = aes(x = verified, y = n, fill = verified)) +
+  geom_col()
+```
+
+
+### Hashtags
+
+```{r}
+hashtags_vect <- raw_df %>% 
+  filter(! is.na(hashtags)) %>% 
+  pull(hashtags) %>% 
+  unlist()
+
+hashtags_df <- tibble(hashtag = hashtags_vect) %>% 
+  mutate(hashtag = str_to_lower(string = hashtag)) %>% 
+  count(hashtag) %>% 
+  arrange(-n)
+```
+
+```{r}
+hashtags_df %>% mutate(n = n /sum(n)) %>% 
+  top_n(n = 30, wt = n) %>% 
+  mutate(hashtag = reorder(hashtag, n)) %>%
+  ggplot(aes(x = hashtag, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = 'Hashtag Count')
+```
+
+```{r}
+wordcloud(
+  words = hashtags_df$hashtag, 
+  freq = hashtags_df$n, 
+  min.freq = 500, 
+  colors = brewer.pal(8, "Dark2"))
+
+```
+
+Let us plot the time development of certain specific keywords: 
+
+- `#cacerolazo`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = hashtags, pattern = "cacerolazo")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with #cacerolazo")
+```
+
+- `#toquedequeda`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = hashtags, pattern = "toquedequeda")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with #toquedequeda")
+```
+
+- `esmad`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "esmad")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: esmad")
+```
+
+- `miedo`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "miedo")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: miedo")
+```
+
+- `violencia`
+
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "violencia")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: violencia")
+```
+```{r}
+raw_df %>% 
+  filter(str_detect(string = text, pattern = "vándalos")) %>% 
+  mutate(created_at_round_hour = (created_at - (5*3600)) %>% round(units = "hour") %>% as.POSIXct()) %>% 
+  group_by(created_at_round_hour) %>% 
+  count() %>% 
+  ggplot(mapping = aes(x = created_at_round_hour, y = n)) +
+  geom_line() +
+  ggtitle(label = "Number of Tweets (All) per Hour with keyword: vándalos")
+```
+
+### Favorite Count
+
+```{r}
+raw_df %>% 
+  group_by(screen_name) %>% 
+  summarise(favorite_count  = sum(favorite_count)) %>% 
+  ungroup() %>% 
+  arrange(- favorite_count ) %>% 
+  head(30) %>% 
+  mutate(screen_name = reorder(screen_name, favorite_count)) %>%
+  ggplot(aes(x = screen_name, y = favorite_count)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Top Favorite Count")
+```
+
+Let us get the text of the most favorite mentions:
+
+```{r}
+raw_df %>% 
+  select(screen_name, text, favorite_count) %>% 
+  arrange(- favorite_count) %>% 
+  head(10)
+```
+
+### Top - Tweets
+
+Top (direct) retweeted people:
+
+```{r}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  group_by(screen_name) %>% 
+  summarise(retweet_count = sum(retweet_count)) %>% 
+  ungroup() %>% 
+  arrange(- retweet_count) %>% 
+  head(30) %>% 
+  mutate(screen_name = reorder(screen_name, retweet_count)) %>%
+  ggplot(aes(x = screen_name, y = retweet_count)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Top Retweeted Users")
+```
+
+Let us get the text of the most retweeted mentions:
+
+```{r}
+raw_df %>% 
+  filter(is_retweet == FALSE) %>% 
+  select(screen_name, text, retweet_count) %>% 
+  arrange(- retweet_count) %>% 
+  head(10)
+```
+
+### Retweet Network 
+
+Let us define a retweet weighted directed network as follows:
+
+- Nodes: 
+  - Source = `screen_name` 
+  - Target = `retweet_screen_name`
+  
+- Edges: Two nodes are conected if there is at least `threshold` number of retweets. 
+
+- Weight: number of retweets. 
+
+For visualization purposes: Let `threshold` > 0. We can filter edges which have weight less than `threshold`. 
+
+First, we construct a data frame. 
+
+```{r}
+# Construct retweet network. 
+retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name) %>% 
+  rename(weight = n)
+```
+
+We now construct the network from the dataframe above. 
+
+```{r}
+retweets_graph <- graph_from_data_frame(d = retweets_df, directed = TRUE)
+```
+
+```{r}
+# Verify we have a weighted directed graph. 
+is.directed(retweets_graph) & is.directed(retweets_graph)
+```
+
+```{r}
+# We compute in/out degree for each node.  
+V(retweets_graph)$tweets_in <- strength(graph = retweets_graph, mode = "in")
+V(retweets_graph)$tweets_out <- strength(graph = retweets_graph, mode = "out")
+
+retweets_deg_df <- tibble(
+  screen_name = V(retweets_graph)$name, 
+  tweets_in = V(retweets_graph)$tweets_in,
+  tweets_out = V(retweets_graph)$tweets_out
+)
+```
+
+```{r}
+#We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most
+retweets_deg_df %>% arrange(- tweets_in) %>% head(10)
+```
+```{r}
+# Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+retweets_deg_df %>% arrange(- tweets_out)
+```
+
+- Visualization
+
+```{r}
+# Set weight threshold. 
+threshold <- 11
+
+red_retweets_df <- raw_df %>% 
+  filter(is_retweet == TRUE) %>% 
+  select(screen_name, retweet_screen_name) %>% 
+  count(screen_name, retweet_screen_name) %>% 
+  rename(weight = n) %>% 
+  filter(weight >= threshold)
+
+red_retweets_graph <- graph_from_data_frame(d = red_retweets_df, directed = TRUE)
+
+# We compute in/out degree for each node.  
+V(red_retweets_graph)$tweets_in <- strength(graph = red_retweets_graph, mode = "in")
+V(red_retweets_graph)$tweets_out <- strength(graph = red_retweets_graph, mode = "out")
+```
+
+```{r}
+# Compute the weight shares.
+E(red_retweets_graph)$width <- E(red_retweets_graph)$weight/max(E(red_retweets_graph)$weight)
+
+# Create networkD3 object.
+network_d3 <- igraph_to_networkD3(g = red_retweets_graph)
+# Define node size.
+network_d3$nodes %<>% mutate(Degree = (1/400)*V(red_retweets_graph)$tweets_in)
+# Degine color group (I will explore this feature later).
+network_d3$nodes %<>% mutate(Group = 1)
+# Define edges width. 
+network_d3$links$Width <- 10*E(red_retweets_graph)$width
+
+network_d3_viz <- forceNetwork(
+  Links = network_d3$links, 
+  Nodes = network_d3$nodes, 
+  arrows = TRUE,
+  Source = "source", 
+  Target = "target",
+  NodeID = "name",
+  Group = "Group", 
+  opacity = 0.9,
+  Value = "Width",
+  Nodesize = "Degree", 
+  # We input a JavaScript function.
+  linkWidth = JS("function(d) { return Math.sqrt(d.value); }"), 
+  fontSize = 12,
+  zoom = TRUE, 
+  opacityNoHover = 1, 
+)
+
+saveNetwork(
+  network = network_d3_viz, 
+  file = "retweet_network.html", 
+  selfcontained = TRUE
+)
+```
+
+### Text Analysis
+
+- Text Cleaning
+
+```{r}
+tweets_corpus <- VCorpus(
+  VectorSource(
+    raw_df %>% 
+      filter(lang == "es") %>% 
+      mutate(text = str_to_lower(text)) %>% 
+      pull(text)
+  )
+)
+```
+
+```{r}
+rm_pattern <- content_transformer( 
+  function (x, pattern) str_remove_all(string = x, pattern = pattern)
+)
+
+url_pattern <- " ?(f|ht)(tp)(s?):(//)?\\S+"
+
+clean_tweets_corpus <- tweets_corpus %>% 
+  tm_map(rm_pattern, "/") %>% 
+  tm_map(rm_pattern, "\\|") %>% 
+  tm_map(rm_pattern, url_pattern) %>% 
+  tm_map(stripWhitespace) %>% 
+  tm_map(PlainTextDocument)
+
+clean_tweets_df <- tibble(
+  clean_text = sapply(X = clean_tweets_corpus, FUN = function(x) x$content)
+)
+```
+
+```{r}
+clean_tweets_df %>% head(100)
+```
+
+- Word Count
+
+```{r}
+stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
+
+words_df <- clean_tweets_df %>% 
+  unnest_tokens(output = word, input = clean_text) %>% 
+  anti_join(y = stopwords_df, by = "word")
+
+word_count <- words_df %>% 
+  count(word) %>% 
+  arrange(- n)
+```
+
+```{r}
+word_count %>% 
+  head(30) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  ggtitle(label = "Word Count")
+```
+
+
+```{r, fig.width=8, fig.align="center"}
+wordcloud(
+  words = word_count$word, 
+  freq = word_count$n, 
+  min.freq = 2500, 
+  colors = brewer.pal(8, "Dark2"))
+```
+
+- 2-Gram Network
+
+```{r}
+bigram_count <- clean_tweets_df %>% 
+  unnest_tokens(input = clean_text, output = bigram, token = "ngrams", n = 2) %>% 
+  separate(col = bigram, into = c("word1", "word2"), sep = " ") %>% 
+  filter(! word1 %in% stopwords_df$word) %>% 
+  filter(! word2 %in% stopwords_df$word) %>% 
+  filter(! is.na(word1)) %>% 
+  filter(! is.na(word2)) %>% 
+  count(word1, word2, sort = TRUE) %>% 
+  mutate(
+    word_minus = case_when(
+      (word1 <= word2) ~ word1, 
+      (word1 > word2) ~ word2
+    ),
+    word_plus = case_when(
+      (word1 <= word2) ~ word2, 
+      (word1 > word2) ~ word1
+    )
+  ) %>% 
+  group_by(word_minus, word_plus) %>% 
+  summarise(n = sum(n)) %>% 
+  filter(word_minus != word_plus) %>% 
+  rename(weight = n)
+  
+```
+
+```{r}
+bigram_threshold <- 4500
+
+bigram_network <- bigram_count %>%
+  filter(weight > bigram_threshold) %>%
+  mutate(weight = log(weight + 1)) %>% 
+  graph_from_data_frame(directed = FALSE)
+```
+
+```{r, fig.width=10, fig.height=10,  fig.align="center"}
+pdf("bigram_network.pdf")
+
+V(bigram_network)$degree <- strength(graph = bigram_network)
+
+E(bigram_network)$width <- E(bigram_network)$weight/max(E(bigram_network)$weight)
+
+plot(
+  bigram_network, 
+  vertex.size = (1E-5)*V(bigram_network)$degree,
+  vertex.color = "lightblue",
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.3, 
+  vertex.label.dist = 0.2,
+  edge.color = "gray", 
+  edge.width = 1*E(bigram_network)$width,
+  main = "Bigram Count Network",
+  alpha = 50, 
+  layout = layout_with_fr(graph = bigram_network), 
+)
+
+dev.off() 
+```
+
+- Skipgram Network
+
+```{r}
+skip_window <- 2
+
+skipgram_words <- clean_tweets_df %>% 
+  unnest_tokens(
+    input = clean_text, 
+    output = skipgram, 
+    token = "skip_ngrams", 
+    n = skip_window
+  ) %>% 
+  filter(! is.na(skipgram))
+```
+
+```{r}
+skipgram_words$num_words <- skipgram_words$skipgram %>% 
+  map_int(.f = ~ ngram::wordcount(.x))
+
+skipgram_words %<>% 
+  filter(num_words == 2) %>% 
+  select(- num_words)
+
+skipgram_words %<>% 
+  separate(col = skipgram, into = c("word1", "word2"), sep = " ") %>% 
+  filter(! word1 %in% stopwords_df$word) %>% 
+  filter(! word2 %in% stopwords_df$word) %>% 
+  filter(! is.na(word1)) %>% 
+  filter(! is.na(word2)) 
+
+skipgram_count <- skipgram_words  %>% 
+  count(word1, word2, sort = TRUE)
+
+skipgram_count %<>% 
+  mutate(
+    word_minus = case_when(
+      (word1 <= word2) ~ word1, 
+      (word1 > word2) ~ word2
+    ),
+    word_plus = case_when(
+      (word1 <= word2) ~ word2, 
+      (word1 > word2) ~ word1
+    )
+  ) %>% 
+  group_by(word_minus, word_plus) %>% 
+  summarise(n = sum(n)) %>% 
+  filter(word_minus != word_plus) %>% 
+  rename(weight = n)
+```
+
+```{r}
+skipgram_threshold <- 5000
+
+skipgram_network <- skipgram_count %>%
+  filter(weight > skipgram_threshold) %>%
+  mutate(weight = log(weight + 1)) %>% 
+  graph_from_data_frame(directed = FALSE)
+```
+
+```{r, fig.width=10, fig.height=10,  fig.align="center"}
+pdf("skipgram_network.pdf") 
+
+V(skipgram_network)$degree <- strength(graph = skipgram_network)
+
+E(skipgram_network)$width <- E(skipgram_network)$weight /max(E(skipgram_network)$weight)
+
+plot(
+  skipgram_network, 
+  vertex.size = (1E-2)*V(skipgram_network)$degree,
+  vertex.color = "lightblue",
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.3, 
+  vertex.label.dist = 0.2,
+  edge.color = "gray", 
+  edge.width = 1.0*E(skipgram_network)$width,
+  main = "Skipgram Count Network",
+  alpha = 50, 
+  layout = layout_with_fr(graph = skipgram_network), 
+)
+
+dev.off() 
+```
+
