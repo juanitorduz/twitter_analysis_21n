@@ -30,7 +30,7 @@ tweets_text_df <- readRDS(file = "../data/tweets_text_df.rds")
 hashtags_count_df <- readRDS(file = "../data/hashtags_count.rds")
 ```
 
-## Hashtags
+## Tracked Hashtags
 
 In the data gathering phase we tracked the following hashtags:
 
@@ -76,20 +76,48 @@ hashtags_count_df %>%
 ggtitle(label = "Top Hashtags Count (Share)") 
 ```
 
+## Tweets Over Time
+
+Let us see the time development of these hashtags over time: 
+
 ```{r, fig.align="center"}
 tweets_text_df %>% 
   count(created_at_round_hour) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n)) +
-  geom_line(color = PALETTE_SET1[2])
+  geom_line(color = PALETTE_SET1[2]) +
+  labs(title = "Tweets Over Time")
 ```
+
+We see a remarkable peak. Let us find the time it happened:
+
+```{r}
+tweets_text_df %>% 
+  count(created_at_round_hour) %>% 
+  arrange(-n) %>% 
+  head(5)
+```
+
+The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this: cacerolazo and the media spread on chaos in Bogota and Cali. We need to understand this better.
 
 ```{r, fig.align="center"}
 tweets_text_df %>% 
   count(created_at_round_hour, is_retweet) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
-  geom_line()
+  geom_line() +
+  labs(title = "Tweets Over Time")
 ```
 
+```{r, fig.align="center"}
+top_hashtags <- hashtags_count_df %>% head(3) %>% pull(hashtag)
 
+top_hashtags %>% map_df(
+  .f = ~ get_hashtag_over_time(tweets_text_df = tweets_text_df, hashtag = .x) %>% 
+    mutate(hashtag = .x)
+  ) %>% 
+  ggmyplot(mapping = aes(x = created_at_round_hour, y =n, color = hashtag)) + 
+  geom_line() +
+  labs(title = "Top Hashtags Count")
+
+```
 
 

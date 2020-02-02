@@ -60,3 +60,11 @@ get_top_hashtags_df <- function (hashtags_df, n) {
   
   return(top_hashtags_df)
 }
+
+
+get_hashtag_over_time <- function (tweets_text_df, hashtag) {
+  
+  tweets_text_df %>% 
+    filter(str_detect(string = clean_text, pattern = hashtag)) %>% 
+    count(created_at_round_hour)
+}

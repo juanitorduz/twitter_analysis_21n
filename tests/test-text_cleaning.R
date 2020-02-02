@@ -1,7 +1,7 @@
 library(testthat)
 
 source("../R/text_cleaning.R")
-print(1)
+
 test_that(desc = "Clean Tweet Text", code = {
   clean_text_1 <- clean_tweets(tweet_text = "  ** https://google.com.co juanito.. ..")
   clean_text_2 <- clean_tweets(tweet_text = "!!! tabitas http://google.com.co")
