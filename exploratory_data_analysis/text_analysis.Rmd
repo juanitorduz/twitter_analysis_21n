@@ -21,6 +21,7 @@ library(wordcloud)
 source(file = "../R/hashtags.R")
 source(file = "../R/newtheme.R")
 source(file = "../R/text_cleaning.R")
+source(file = "../R/text_mining.R")
 ```
 
 ## Read Data
@@ -107,17 +108,140 @@ tweets_text_df %>%
   labs(title = "Tweets Over Time")
 ```
 
+## Top Hashtags
+
 ```{r, fig.align="center"}
 top_hashtags <- hashtags_count_df %>% head(3) %>% pull(hashtag)
+top_hashtags <- str_c("#", top_hashtags)
 
 top_hashtags %>% map_df(
-  .f = ~ get_hashtag_over_time(tweets_text_df = tweets_text_df, hashtag = .x) %>% 
+  .f = ~ get_text_over_time(tweets_text_df = tweets_text_df, txt_pattern = .x, no_hashtag = FALSE) %>% 
     mutate(hashtag = .x)
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y =n, color = hashtag)) + 
   geom_line() +
   labs(title = "Top Hashtags Count")
-
 ```
 
+## Word Count
+
+```{r}
+stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
+
+words_df <- tweets_text_df %>% 
+  unnest_tokens(output = word, input = clean_text_no_hashtag) %>% 
+  anti_join(y = stopwords_df, by = "word")
+
+word_count <- words_df %>% 
+  count(word) %>% 
+  arrange(- n)
+```
+
+```{r, fig.align="center"}
+word_count %>% 
+  mutate(word = reorder(word, n)) %>%
+  head(35) %>% 
+  ggmyplot(mapping = aes(x = word, y = n)) +
+  geom_col(fill = PALETTE_SET1[2]) +
+  coord_flip() +
+  labs(title = "Word Count (No Hashtags)")
+```
+
+```{r, fig.align="center", fig.width=6}
+wordcloud(
+  words = head(word_count, 500)$word, 
+  freq = head(word_count, 500)$n, 
+  min.freq = 10000, 
+  colors = brewer.pal(8, "Dark2"))
+```
+
+```{r, fig.align="center"}
+input_word <- "marcha"
+
+relative_word_count <- get_relatve_word_count(
+  tweets_text_df = tweets_text_df, 
+  stopwords_df = stopwords_df, 
+  input_word = input_word 
+)
+
+relative_word_count %>% 
+  mutate(word = reorder(word, n)) %>%
+  head(35) %>% 
+  ggmyplot(mapping = aes(x = word, y = n)) +
+  geom_col(fill = PALETTE_SET1[2]) +
+  coord_flip() +
+  labs(title = glue::glue("Relative Word Count - {input_word}"))
+```
+```{r, fig.align="center"}
+words_vect <- c(
+  "marcha", 
+  "gobierno",
+  "ivanduque", 
+  "colombia",
+  "protesta", 
+  "esmad", 
+  "paro", 
+  "pacífica"
+)
+
+words_vect %>% map_df(
+  .f = ~ get_text_over_time(tweets_text_df = tweets_text_df, txt_pattern = .x, no_hashtag = TRUE) %>% 
+    mutate(word = .x)
+  ) %>% 
+  ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
+  geom_line() + 
+  labs(title = "Related Words - Marcha")
+```
+```{r, fig.align="center"}
+input_word <- "cacerolazo"
+
+relative_word_count <- get_relatve_word_count(
+  tweets_text_df = tweets_text_df, 
+  stopwords_df = stopwords_df, 
+  input_word = input_word 
+)
+
+relative_word_count %>% 
+  mutate(word = reorder(word, n)) %>%
+  head(35) %>% 
+  ggmyplot(mapping = aes(x = word, y = n)) +
+  geom_col(fill = PALETTE_SET1[2]) +
+  coord_flip() +
+  labs(title = glue::glue("Relative Word Count - {input_word}"))
+```
+
+```{r, fig.align="center"}
+words_vect <- c(
+  "cacerolazo", 
+  "gobierno",
+  "violencia", 
+  "miedo", 
+  "vándalos"
+)
+
+words_vect %>% map_df(
+  .f = ~ get_text_over_time(tweets_text_df = tweets_text_df, txt_pattern = .x, no_hashtag = TRUE) %>% 
+    mutate(word = .x)
+  ) %>% 
+  ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
+  geom_line() +
+  labs(title = "Related Words - Cacerolazo")
+```
+
+```{r, fig.align="center"}
+words_vect <- c(
+  "barranquilla",
+  "bogotá", 
+  "cali", 
+  "medellín"
+)
+
+words_vect %>% map_df(
+  .f = ~ get_text_over_time(tweets_text_df = tweets_text_df, txt_pattern = .x, no_hashtag = TRUE) %>% 
+    mutate(word = .x)
+  ) %>% 
+  ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
+  geom_line() +
+  labs(title = "Top Colombian Cities")
+```
 
