@@ -15,6 +15,7 @@ library(lubridate)
 library(tidytext)
 library(tidyverse)
 library(tm)
+library(topicmodels)
 library(widyr)
 library(wordcloud)
 
@@ -25,6 +26,8 @@ source(file = "../R/text_mining.R")
 ```
 
 ## Read Data
+
+We read the pre-processed data obtanied from `R/data_processed.R`. 
 
 ```{r, read data}
 tweets_text_df <- readRDS(file = "../data/tweets_text_df.rds")
@@ -58,7 +61,7 @@ twitter_terms <- c(
 )
 ```
 
-Let us see the top hastags appearing ini the data:
+Let us see the top hastags appearing in the data:
 
 ```{r, fig.align="center"}
 normalized_twitter_terms <- twitter_terms %>% 
@@ -79,7 +82,7 @@ ggtitle(label = "Top Hashtags Count (Share)")
 
 ## Tweets Over Time
 
-Let us see the time development of these hashtags over time: 
+Let us see the time development of these hashtags over time (which has already been converted into Colombian local time): 
 
 ```{r, fig.align="center"}
 tweets_text_df %>% 
@@ -100,6 +103,8 @@ tweets_text_df %>%
 
 The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this: cacerolazo and the media spread on chaos in Bogota and Cali. We need to understand this better.
 
+Let us see the organic vs retweets mentions: 
+
 ```{r, fig.align="center"}
 tweets_text_df %>% 
   count(created_at_round_hour, is_retweet) %>% 
@@ -109,6 +114,8 @@ tweets_text_df %>%
 ```
 
 ## Top Hashtags
+
+Next we analyze the time development of the most popular hashtags:
 
 ```{r, fig.align="center"}
 top_hashtags <- hashtags_count_df %>% head(3) %>% pull(hashtag)
@@ -123,7 +130,14 @@ top_hashtags %>% map_df(
   labs(title = "Top Hashtags Count")
 ```
 
+We clearly see two clusters which define the two prnciipal content of the tweets:
+
+  - The protests of the 21N.
+  - The cacerolazo. 
+
 ## Word Count
+
+Next we do some initial descriptive statistics on the words used in the tweets (removing the hashtags). 
 
 ```{r}
 stopwords_df <- tibble(word = stopwords::stopwords(language = "es"))
@@ -147,13 +161,19 @@ word_count %>%
   labs(title = "Word Count (No Hashtags)")
 ```
 
+Let us visualize this as a word cloud:
+
 ```{r, fig.align="center", fig.width=6}
 wordcloud(
-  words = head(word_count, 500)$word, 
-  freq = head(word_count, 500)$n, 
+  words = head(word_count, 1000)$word, 
+  freq = head(word_count, 1000)$n, 
   min.freq = 10000, 
   colors = brewer.pal(8, "Dark2"))
 ```
+
+Let us now do a similar word count but restricting ourselves to tweets containing a specific word defining a topic.
+
+- Marcha (Protest)
 
 ```{r, fig.align="center"}
 input_word <- "marcha"
@@ -172,6 +192,9 @@ relative_word_count %>%
   coord_flip() +
   labs(title = glue::glue("Relative Word Count - {input_word}"))
 ```
+
+Let us see the time development of some of the top words of this ranking:
+
 ```{r, fig.align="center"}
 words_vect <- c(
   "marcha", 
@@ -192,6 +215,14 @@ words_vect %>% map_df(
   geom_line() + 
   labs(title = "Related Words - Marcha")
 ```
+
+Here are some observations:
+
+  - It is interesting that the word "gobierno" (government) is more present surin the cacerolazo than during the protest period itself. 
+  - This is also the case for the word "pacífica" (peaceful). 
+  
+- Cacerolazo
+
 ```{r, fig.align="center"}
 input_word <- "cacerolazo"
 
@@ -228,6 +259,13 @@ words_vect %>% map_df(
   labs(title = "Related Words - Cacerolazo")
 ```
 
+Here are some observations:
+
+  - The high peak is actually somehow split in two topics: cacerolazo and vándalos (vandals). 
+  - The word "miedo" (fear) also appear as a relevant term, which might be related with the mentions about vandals. 
+
+Let us see the mentions of Colombian cities:
+
 ```{r, fig.align="center"}
 words_vect <- c(
   "barranquilla",
@@ -244,4 +282,45 @@ words_vect %>% map_df(
   geom_line() +
   labs(title = "Top Colombian Cities")
 ```
+
+Bogota is clearly dominating. 
+
+## Topic Modeling
+
+```{r}
+# Create a Document-Tem-Matrix
+tweets_text_dtm <- tweets_text_df %>% 
+  select(clean_text_no_hashtag) %>% 
+  rowid_to_column() %>% 
+  unnest_tokens(input = clean_text_no_hashtag, output = "word") %>% 
+  anti_join(y = stopwords_df, by = "word") %>% 
+  count(rowid, word) %>% 
+  cast_dtm(document = rowid, term = word, value = n) 
+
+tweets_text_dtm
+```
+
+```{r}
+lda_model <- LDA(x = tweets_text_dtm, k = 3, control = list(seed = 42))
+
+topics_df <- tidy(x = lda_model, matrix ="beta")
+```
+
+```{r, fig.height=6}
+topic_top_terms <- topics_df %>%
+  group_by(topic) %>%
+  top_n(30, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+topic_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggmyplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  scale_x_reordered()
+```
+
+
 
