@@ -287,7 +287,9 @@ Bogota is clearly dominating.
 
 ## Topic Modeling
 
-```{r}
+### LDA
+
+```{r, eval=FALSE}
 # Create a Document-Tem-Matrix
 tweets_text_dtm <- tweets_text_df %>% 
   select(clean_text_no_hashtag) %>% 
@@ -300,13 +302,15 @@ tweets_text_dtm <- tweets_text_df %>%
 tweets_text_dtm
 ```
 
-```{r}
+```{r, eval=FALSE}
+# Train model.
 lda_model <- LDA(x = tweets_text_dtm, k = 3, control = list(seed = 42))
 
 topics_df <- tidy(x = lda_model, matrix ="beta")
 ```
 
-```{r, fig.height=6}
+```{r, eval=FALSE}
+# Plot top terms per tocpic. 
 topic_top_terms <- topics_df %>%
   group_by(topic) %>%
   top_n(30, beta) %>%
@@ -315,11 +319,127 @@ topic_top_terms <- topics_df %>%
 
 topic_top_terms %>%
   mutate(term = reorder_within(term, beta, topic)) %>%
-  ggmyplot(aes(term, beta, fill = factor(topic))) +
+  ggmyplot(mapping = aes(term, beta, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
   coord_flip() +
   scale_x_reordered()
+```
+
+Topic modeling (in my experience) does not work very well with social media data.
+
+### Text Networks
+
+Count the noumber of pairwise ocurrence per post.
+
+```{r}
+abs_pairwise_count_df <- tweets_text_df %>% 
+  select(clean_text) %>% 
+  rowid_to_column() %>% 
+  unnest_tokens(output = word, input = clean_text) %>% 
+  anti_join(y = stopwords_df, by = "word") %>% 
+  pairwise_count(item = word, feature = rowid) %>% 
+  filter(item1 < item2) %>% arrange(item1, item2) %>% 
+  rename(weight = n) %>% 
+  arrange(- weight)
+```
+
+Define a text graph. We wet a threshold to control noise. 
+
+```{r}
+weight_threshold <- 3000
+
+abs_pairwise_graph <- graph_from_data_frame(
+  d = filter(abs_pairwise_count_df, weight > weight_threshold), 
+  directed = FALSE
+)
+```
+
+We just consider the biggest connected component. 
+
+```{r}
+E(abs_pairwise_graph)$weight_log <- log(E(abs_pairwise_graph)$weight)
+
+V(abs_pairwise_graph)$component <- clusters(graph = abs_pairwise_graph)$membership
+
+V(abs_pairwise_graph)$degree <- strength(graph = abs_pairwise_graph)
+
+mask_top <- which(V(abs_pairwise_graph)$component == which.max(clusters(graph = abs_pairwise_graph)$csize))
+
+top_abs_pairwise_graph <- induced_subgraph(
+  graph = abs_pairwise_graph,
+  vids = mask_top
+)
+```
+
+
+Run community detection algorithm to detect topics. 
+
+```{r}
+louvain_obj <- cluster_louvain(
+  graph = top_abs_pairwise_graph, 
+  weights = E(top_abs_pairwise_graph)$weight
+)
+
+V(top_abs_pairwise_graph)$membership <- membership(communities = louvain_obj)   
+
+length(unique(V(top_abs_pairwise_graph)$membership))
+```
+
+Plot graph:
+
+```{r}
+pdf("../images/abs_count_graph.pdf") 
+
+# Compute the weight shares.
+E(top_abs_pairwise_graph)$width <- E(top_abs_pairwise_graph)$weight_log/max(E(top_abs_pairwise_graph)$weight_log)
+
+ plot(
+  top_abs_pairwise_graph, 
+  vertex.color = V(top_abs_pairwise_graph)$membership,
+  vertex.frame.color = V(top_abs_pairwise_graph)$membership,
+  # Scale node size by degree.
+  vertex.size = V(top_abs_pairwise_graph)$degree / 1E6,
+  vertex.label.color = "black", 
+  vertex.label.cex = 0.12, 
+  vertex.label.dist = 0.12,
+  edge.color = "gray", 
+  # Set edge width proportional to the weight relative value.
+  edge.width = (0.01)*E(top_abs_pairwise_graph)$width ,
+  main = '21N - Twitter', 
+  sub = "Word Network - Topics", 
+  alpha = 50, 
+  palette = c(PALETTE_SET1, "deepskyblue")
+)
+
+dev.off()
+```
+
+Get topic summary. 
+
+```{r, fig.align="center", fig.width=8}
+membership_df <- tibble(
+  word = names(V(top_abs_pairwise_graph)),
+  cluster = str_c("topic_cluster_", as.character(V(top_abs_pairwise_graph)$membership)),
+  degree = V(top_abs_pairwise_graph)$degree
+)
+
+membership_df %>%
+  pull(cluster) %>% 
+  unique() %>% 
+  sort() %>% 
+  map_df(.f = function(cluster_id) {
+    
+    membership_df %>% 
+      filter(cluster == cluster_id) %>% 
+      head(15)
+  }) %>% 
+  mutate(word = reorder(word, degree)) %>%
+  ggmyplot(mapping = aes(x = word, y = degree, fill = as.character(cluster))) +
+  geom_col(color = "black") +
+  coord_flip() +
+  facet_wrap(facets = ~ cluster, scales = "free") +
+  scale_fill_brewer(palette = "Set3")
 ```
 
 
