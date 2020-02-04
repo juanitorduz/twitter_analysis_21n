@@ -5,8 +5,11 @@ source(file = "R/time.R")
 print("Reading Raw Data")
 raw_df <- readRDS(file = "data/25_11_2019_twitter_21n.rds")
 
+print("Filter Lang = ES")
+data_df <- raw_df %>% filter(lang == "es")
+
 print("Add Time Features")
-data_df <- add_time_features(raw_df = raw_df)
+data_df <- add_time_features(raw_df = data_df)
 saveRDS(object = data_df, file = "data/data_df.rds")
 
 #print("Unnest Hashtags")
