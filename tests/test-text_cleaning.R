@@ -12,3 +12,12 @@ test_that(desc = "Clean Tweet Text", code = {
   expect_equal(clean_text_3, "")
   expect_equal(clean_text_4, "#elguay")
 })
+
+test_that(desc = "Remove Hashtags", code = {
+  clean_text_1 <- rm_hashtags(x = "hola #como estas")
+  clean_text_2 <- rm_hashtags(x = "#foo")
+  clean_text_3 <- rm_hashtags(x = "#foo#bar")
+  expect_equal(clean_text_1, "hola  estas")
+  expect_equal(clean_text_2, "")
+  expect_equal(clean_text_3, "")
+})
