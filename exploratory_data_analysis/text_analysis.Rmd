@@ -9,15 +9,25 @@ In this notebook we analyse the content of the tweets. We want to understand whi
 ```{r, warning=FALSE,  message=FALSE}
 knitr::opts_knit$set(warning=FALSE, message=FALSE)
 
-library(igraph)
-library(magrittr)
-library(lubridate)
-library(tidytext)
-library(tidyverse)
-library(tm)
-library(topicmodels)
-library(widyr)
-library(wordcloud)
+
+if(!require(igraph)) install.packages("igraph",repos = "http://cran.us.r-project.org")
+library("igraph")
+if(!require(magrittr)) install.packages("magrittr",repos = "http://cran.us.r-project.org")
+library("magrittr")
+if(!require(lubridate)) install.packages("lubridate",repos = "http://cran.us.r-project.org")
+library("lubridate")
+if(!require(tidytext)) install.packages("tidytext",repos = "http://cran.us.r-project.org")
+library("tidytext")
+if(!require(tidyverse)) install.packages("tidyverse",repos = "http://cran.us.r-project.org")
+library("tidyverse")
+if(!require(tm)) install.packages("tm",repos = "http://cran.us.r-project.org")
+library("tm")
+if(!require(topicmodels)) install.packages("topicmodels",repos = "http://cran.us.r-project.org")
+library("topicmodels")
+if(!require(widyr)) install.packages("widyr",repos = "http://cran.us.r-project.org")
+library("widyr")
+if(!require(wordcloud)) install.packages("wordcloud",repos = "http://cran.us.r-project.org")
+library("wordcloud")
 
 source(file = "../R/hashtags.R")
 source(file = "../R/newtheme.R")
@@ -30,7 +40,9 @@ source(file = "../R/text_mining.R")
 We read the pre-processed data obtanied from `R/data_processed.R`. 
 
 ```{r, read data}
+#tweets_text_df <- readRDS(file = "/Users/sebastianmartinez/Dropbox/0. UoG/Projects/twitter_21n_data/tweets_text_df.rds")
 tweets_text_df <- readRDS(file = "../data/tweets_text_df.rds")
+#hashtags_count_df <- readRDS(file = "/Users/sebastianmartinez/Dropbox/0. UoG/Projects/twitter_21n_data/hashtags_count.rds")
 hashtags_count_df <- readRDS(file = "../data/hashtags_count.rds")
 ```
 
@@ -63,6 +75,13 @@ twitter_terms <- c(
 
 Let us see the top hastags appearing in the data:
 
+---
+**NOTE**
+
+What does the "is_tracked" legend mean? What does it tell us about the different topics people were talking about 
+
+---
+
 ```{r, fig.align="center"}
 normalized_twitter_terms <- twitter_terms %>% 
   str_to_lower() %>% 
@@ -89,7 +108,7 @@ tweets_text_df %>%
   count(created_at_round_hour) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n)) +
   geom_line(color = PALETTE_SET1[2]) +
-  labs(title = "Tweets Over Time")
+  labs(title = "Tweets Over Time") + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
 ```
 
 We see a remarkable peak. Let us find the time it happened:
@@ -101,16 +120,16 @@ tweets_text_df %>%
   head(5)
 ```
 
-The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this: cacerolazo and the media spread on chaos in Bogota and Cali. We need to understand this better.
+The most active hours where on the 21st of November between 20:00 and 23:00. There were many events around this time period which could have contributed to this. Going through the media of that day, we can see that it was around this time that the cacerolazo took place, as well as some reports on criminal activity in Bogota and Cali. We need to understand this better.
 
-Let us see the organic vs retweets mentions: 
+We can take a look at the difference between organic vs retweets and mentions: 
 
 ```{r, fig.align="center"}
 tweets_text_df %>% 
   count(created_at_round_hour, is_retweet) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
   geom_line() +
-  labs(title = "Tweets Over Time")
+  labs(title = "Tweets Over Time", colour= "Retweet?")  + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
 ```
 
 ## Top Hashtags
@@ -127,10 +146,10 @@ top_hashtags %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y =n, color = hashtag)) + 
   geom_line() +
-  labs(title = "Top Hashtags Count")
+  labs(title = "Top Hashtags Count") + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
 ```
 
-We clearly see two clusters which define the two prnciipal content of the tweets:
+We clearly see two clusters defining the two main activities driving the content of the tweets:
 
   - The protests of the 21N.
   - The cacerolazo. 
@@ -158,10 +177,17 @@ word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = "Word Count (No Hashtags)")
+  labs(title = "Word Count (No Hashtags)") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
 Let us visualize this as a word cloud:
+
+---
+**NOTE**
+
+I don't find these word clouds particularly useful, but that's just me
+
+---
 
 ```{r, fig.align="center", fig.width=6}
 wordcloud(
@@ -171,7 +197,7 @@ wordcloud(
   colors = brewer.pal(8, "Dark2"))
 ```
 
-Let us now do a similar word count but restricting ourselves to tweets containing a specific word defining a topic.
+Let us now do a similar word count but considering only the tweets that contain a specific word defining a topic.
 
 - Marcha (Protest)
 
@@ -190,7 +216,7 @@ relative_word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = glue::glue("Relative Word Count - {input_word}"))
+  labs(title = glue::glue("Relative Word Count - {input_word}")) + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
 Let us see the time development of some of the top words of this ranking:
@@ -213,13 +239,13 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() + 
-  labs(title = "Related Words - Marcha")
+  labs(title = "Related Words - Marcha") + ylab("Number of words") + xlab("Date")+ scale_y_continuous(labels = scales::comma)
 ```
 
 Here are some observations:
 
-  - It is interesting that the word "gobierno" (government) is more present surin the cacerolazo than during the protest period itself. 
-  - This is also the case for the word "pacífica" (peaceful). 
+  - It is interesting that the word "gobierno" (government) is more present during the cacerolazo than during the protest period itself. This suggest that the people were making specific mentions about and to the government during at the time they were tweeting about the cacerolazo.
+  - This is also the case for the word "pacífica" (peaceful). The cacerolazo was seen as a peaceful response to the violent way the protest ended in the plaza de bolivar, which could help explain the association between the two words. 
   
 - Cacerolazo
 
@@ -238,9 +264,16 @@ relative_word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = glue::glue("Relative Word Count - {input_word}"))
+  labs(title = glue::glue("Relative Word Count - {input_word}")) + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
+
+---
+**NOTE**
+
+Is this the number of times each of these words appear, or the number of tweets with the words?
+
+---
 ```{r, fig.align="center"}
 words_vect <- c(
   "cacerolazo", 
@@ -256,12 +289,12 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() +
-  labs(title = "Related Words - Cacerolazo")
+  labs(title = "Related Words - Cacerolazo") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
 Here are some observations:
 
-  - The high peak is actually somehow split in two topics: cacerolazo and vándalos (vandals). 
+  - The high peak is actually somehow split in two topics: cacerolazo and vándalos (vandals). However, we don't the sentiment associated with each of these words. As mentioned above, the cacerolazo was seen as a peaceful response by the general population to the violent end of the protest. Some more analysis is needed to understand how people were talking about vandalism during the cacerolazo. 
   - The word "miedo" (fear) also appear as a relevant term, which might be related with the mentions about vandals. 
 
 Let us see the mentions of Colombian cities:
@@ -280,7 +313,7 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() +
-  labs(title = "Top Colombian Cities")
+  labs(title = "Top Colombian Cities") + ylab("Number of tweets") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
 Bogota is clearly dominating. 
@@ -310,7 +343,7 @@ topics_df <- tidy(x = lda_model, matrix ="beta")
 ```
 
 ```{r, eval=FALSE}
-# Plot top terms per tocpic. 
+# Plot top terms per topic. 
 topic_top_terms <- topics_df %>%
   group_by(topic) %>%
   top_n(30, beta) %>%
@@ -327,6 +360,13 @@ topic_top_terms %>%
 ```
 
 Topic modeling (in my experience) does not work very well with social media data.
+
+---
+**NOTE**
+
+Why? What do we see, what can we expect to see? What could be done to improve these results?
+
+---
 
 ### Text Networks
 
@@ -439,8 +479,13 @@ membership_df %>%
   geom_col(color = "black") +
   coord_flip() +
   facet_wrap(facets = ~ cluster, scales = "free") +
-  scale_fill_brewer(palette = "Set3")
+  scale_fill_brewer(palette = "Set3") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
 ```
 
+---
+**NOTE**
 
+There is a clear difference in how the topics were created. Some topics have very prevalent words (1, 2, 6), while others have a relatively homogeneous distribution. Is this a consequence of the community detection algorithm, or of the results themselves?
+
+---
 
