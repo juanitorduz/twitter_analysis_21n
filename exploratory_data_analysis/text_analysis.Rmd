@@ -9,6 +9,7 @@ In this notebook we analyse the content of the tweets. We want to understand whi
 ```{r, warning=FALSE,  message=FALSE}
 knitr::opts_knit$set(warning=FALSE, message=FALSE)
 
+set.seed(seed = 42)
 
 if(!require(igraph)) install.packages("igraph",repos = "http://cran.us.r-project.org")
 library("igraph")
@@ -80,6 +81,8 @@ Let us see the top hastags appearing in the data:
 
 What does the "is_tracked" legend mean? What does it tell us about the different topics people were talking about 
 
+Answer: It means we pull dat from it on the data gathering phase (see https://github.com/juanitorduz/twitter_analysis_21n/blob/master/data_fetching/data_fetch_description.md).
+
 ---
 
 ```{r, fig.align="center"}
@@ -96,7 +99,9 @@ hashtags_count_df %>%
   geom_col() +
   xlab(NULL) +
   coord_flip() +
-ggtitle(label = "Top Hashtags Count (Share)") 
+  ggtitle(label = "Top Hashtags Count (Share)") + 
+  ylab("Share") +
+  scale_y_continuous(labels = scales::percent)
 ```
 
 ## Tweets Over Time
@@ -108,7 +113,10 @@ tweets_text_df %>%
   count(created_at_round_hour) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n)) +
   geom_line(color = PALETTE_SET1[2]) +
-  labs(title = "Tweets Over Time") + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
+  labs(title = "Tweets Over Time") + 
+  xlab("Date") + 
+  ylab("Number of tweets") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 We see a remarkable peak. Let us find the time it happened:
@@ -129,7 +137,10 @@ tweets_text_df %>%
   count(created_at_round_hour, is_retweet) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = is_retweet)) +
   geom_line() +
-  labs(title = "Tweets Over Time", colour= "Retweet?")  + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
+  labs(title = "Tweets Over Time", colour= "Retweet?")  + 
+  xlab("Date") + 
+  ylab("Number of tweets") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 ## Top Hashtags
@@ -146,7 +157,10 @@ top_hashtags %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y =n, color = hashtag)) + 
   geom_line() +
-  labs(title = "Top Hashtags Count") + xlab("Date") + ylab("Number of tweets") + scale_y_continuous(labels = scales::comma)
+  labs(title = "Top Hashtags Count") + 
+  xlab("Date") + 
+  ylab("Number of tweets") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 We clearly see two clusters defining the two main activities driving the content of the tweets:
@@ -177,7 +191,10 @@ word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = "Word Count (No Hashtags)") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  labs(title = "Word Count (No Hashtags)") + 
+  ylab("Number of word appearance") +
+  xlab("Word") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Let us visualize this as a word cloud:
@@ -185,7 +202,9 @@ Let us visualize this as a word cloud:
 ---
 **NOTE**
 
-I don't find these word clouds particularly useful, but that's just me
+I don't find these word clouds particularly useful, but that's just me.
+
+# Answer: It could be just a pic for an intro slide :) 
 
 ---
 
@@ -197,7 +216,7 @@ wordcloud(
   colors = brewer.pal(8, "Dark2"))
 ```
 
-Let us now do a similar word count but considering only the tweets that contain a specific word defining a topic.
+Let us now do a similar word count but cfiltering only the tweets that contain a specific word defining a topic.
 
 - Marcha (Protest)
 
@@ -216,7 +235,10 @@ relative_word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = glue::glue("Relative Word Count - {input_word}")) + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  labs(title = glue::glue("Relative Word Count - {input_word}")) + 
+  ylab(glue::glue("Number appearances in tweets' text containint the word: {input_word}")) + 
+  xlab("Word") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Let us see the time development of some of the top words of this ranking:
@@ -239,7 +261,10 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() + 
-  labs(title = "Related Words - Marcha") + ylab("Number of words") + xlab("Date")+ scale_y_continuous(labels = scales::comma)
+  labs(title = "Related Words - Marcha") + 
+  ylab("Number appearances in tweets' text") + 
+  xlab("Date") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Here are some observations:
@@ -264,7 +289,10 @@ relative_word_count %>%
   ggmyplot(mapping = aes(x = word, y = n)) +
   geom_col(fill = PALETTE_SET1[2]) +
   coord_flip() +
-  labs(title = glue::glue("Relative Word Count - {input_word}")) + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  labs(title = glue::glue("Relative Word Count - {input_word}")) + 
+  ylab(glue::glue("Number appearances in tweets' text containint the word: {input_word}")) + 
+  xlab("Word") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 
@@ -272,6 +300,8 @@ relative_word_count %>%
 **NOTE**
 
 Is this the number of times each of these words appear, or the number of tweets with the words?
+
+Answer: It is the number of times each word appears. 
 
 ---
 ```{r, fig.align="center"}
@@ -289,7 +319,10 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() +
-  labs(title = "Related Words - Cacerolazo") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  labs(title = "Related Words - Cacerolazo") + 
+  ylab("Number appearances in tweets' text") +  
+  xlab("Word") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Here are some observations:
@@ -313,7 +346,10 @@ words_vect %>% map_df(
   ) %>% 
   ggmyplot(mapping = aes(x = created_at_round_hour, y = n, color = word)) + 
   geom_line() +
-  labs(title = "Top Colombian Cities") + ylab("Number of tweets") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  labs(title = "Top Colombian Cities") + 
+  ylab("Number appearances in tweets' text") +  
+  xlab("Word") + 
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Bogota is clearly dominating. 
@@ -365,6 +401,8 @@ Topic modeling (in my experience) does not work very well with social media data
 **NOTE**
 
 Why? What do we see, what can we expect to see? What could be done to improve these results?
+
+Answer: I tried k = 2, ..., 5 topics and the results were not very good: cluster of topics are not really interpretable. I have had better results with the network analysis below. You can try it out yourself. (It takes a while to fit this LDA Model).
 
 ---
 
@@ -479,13 +517,18 @@ membership_df %>%
   geom_col(color = "black") +
   coord_flip() +
   facet_wrap(facets = ~ cluster, scales = "free") +
-  scale_fill_brewer(palette = "Set3") + ylab("Number of words") + xlab("Word")+ scale_y_continuous(labels = scales::comma)
+  scale_fill_brewer(palette = "Set3") + 
+  ylab("Number of words") + 
+  xlab("Word") +  
+  scale_y_continuous(labels = scales::comma)
 ```
 
 ---
 **NOTE**
 
 There is a clear difference in how the topics were created. Some topics have very prevalent words (1, 2, 6), while others have a relatively homogeneous distribution. Is this a consequence of the community detection algorithm, or of the results themselves?
+
+Answer: Interesting observation! I do not have a clear answer for this, but is definitevly something to dig in. 
 
 ---
 
