@@ -151,3 +151,7 @@ vignettes/*.pdf
 *.rds
 *.parquet
 *.json
+
+# Others
+.DS_Store
+*.DS_Store
