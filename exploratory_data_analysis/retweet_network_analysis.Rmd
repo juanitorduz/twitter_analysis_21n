@@ -1,0 +1,90 @@
+---
+title: "Retweet Network"
+---
+
+## Prepare Notebook
+
+```{r, warning=FALSE,  message=FALSE}
+knitr::opts_knit$set(warning=FALSE, message=FALSE)
+
+set.seed(seed = 42)
+
+if(!require(igraph)) install.packages("igraph",repos = "http://cran.us.r-project.org")
+library("igraph")
+if(!require(magrittr)) install.packages("magrittr",repos = "http://cran.us.r-project.org")
+library("magrittr")
+if(!require(lubridate)) install.packages("lubridate",repos = "http://cran.us.r-project.org")
+library("lubridate")
+if(!require(tidytext)) install.packages("tidytext",repos = "http://cran.us.r-project.org")
+library("tidytext")
+if(!require(tidyverse)) install.packages("tidyverse",repos = "http://cran.us.r-project.org")
+library("tidyverse")
+
+source(file = "../R/retweet_network.R")
+```
+
+
+## Read Data
+
+```{r}
+data_df <- readRDS(file = "../data/data_df.rds")
+```
+
+## Construct Complete Retweet Network 
+
+```{r}
+retweet_network_df <- get_retweet_network_df(data_df = data_df)
+retweet_network <- get_retweet_network(retweet_network_df = retweet_network_df)
+```
+
+## In/Out Degree
+
+```{r}
+retweets_deg_df <- get_retweets_deg_df(retweets_network = retweet_network )
+```
+
+```{r}
+#We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most.
+retweets_deg_df %>% 
+  arrange(- tweets_in) %>% 
+  head(10)
+```
+
+```{r}
+# Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+retweets_deg_df %>% 
+  arrange(- tweets_out) %>% 
+  head(10)
+```
+
+## Visualize Retweet Network 
+
+```{r}
+red_retweet_network_df <- get_retweet_network_df(data_df = data_df, weight_threshold = 11)
+red_retweet_network <- get_retweet_network(retweet_network_df = red_retweet_network_df)
+```
+
+```{r}
+pdf("../images/retweet_network.pdf") 
+
+plot(
+  red_retweet_network , 
+  vertex.color = "lightblue",
+  vertex.frame.color = "lightblue",
+  # Scale node size by degree.
+  vertex.size = (5E-4)*(V(red_retweet_network)$tweets_in + 1),
+  vertex.label.color = "black", 
+  vertex.label.cex = (4.3E-2)*((V(red_retweet_network)$tweets_in + 1)^(1/5)), 
+  vertex.label.dist = 0.0,
+  edge.color = "gray", 
+  # Set edge width proportional to the weight relative value.
+  edge.width = (1E-3)*E(red_retweet_network)$weight_scaled,
+  edge.arrow.size = 0.03,
+  main = '21N - Twitter', 
+  sub = "Retweet Network", 
+  alpha = 50
+)
+
+dev.off()
+```
+
