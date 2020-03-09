@@ -88,3 +88,13 @@ plot(
 dev.off()
 ```
 
+
+---
+**NOTE**
+
+I wonder if we can make a static version of the network? I think the benefit of having a dynamic network is outweighed by the computational cost of having it running in the background of the browser. 
+
+Can we remove the names of the users that retweeted the most retweeted individuals? I think it's interesting to see that, for example, Felix de Bedut got retweeted a lot, but I am not really interested in who did it, unless it was someone else that got retweeted a lot. What do you think? 
+
+
+---
