@@ -123,6 +123,7 @@ dev.off()
 ---
 **NOTE**
 
+<<<<<<< HEAD
 Do we need the proportional width for the edges? I can't really see any difference in the figure. 
 ---
 
@@ -135,3 +136,5 @@ Can we remove the names of the users that retweeted the most retweeted individua
 
 
 ---
+=======
+>>>>>>> parent of e14aa16... made a note on the network generating file
