@@ -1,0 +1,132 @@
+---
+title: "Retweet Network"
+---
+
+## Prepare Notebook
+
+```{r, warning=FALSE,  message=FALSE}
+knitr::opts_knit$set(warning=FALSE, message=FALSE)
+
+set.seed(seed = 42)
+
+if(!require(igraph)) install.packages("igraph",repos = "http://cran.us.r-project.org")
+library("igraph")
+if(!require(magrittr)) install.packages("magrittr",repos = "http://cran.us.r-project.org")
+library("magrittr")
+if(!require(lubridate)) install.packages("lubridate",repos = "http://cran.us.r-project.org")
+library("lubridate")
+if(!require(tidytext)) install.packages("tidytext",repos = "http://cran.us.r-project.org")
+library("tidytext")
+if(!require(tidyverse)) install.packages("tidyverse",repos = "http://cran.us.r-project.org")
+library("tidyverse")
+
+source(file = "../R/retweet_network.R")
+```
+
+
+## Read Data
+
+```{r}
+data_df <- readRDS(file = "../data/data_df.rds")
+```
+
+## Construct Complete Retweet Network 
+
+```{r}
+retweet_network_df <- get_retweet_network_df(data_df = data_df)
+retweet_network <- get_retweet_network(retweet_network_df = retweet_network_df)
+```
+
+## In/Out Degree
+
+```{r}
+retweets_deg_df <- get_retweets_deg_df(retweets_network = retweet_network )
+```
+
+We can sort with respect to `tweets_in`, which measures users whose tweets where retweeted the most. We select the top ten retweeted people to make a more readable graph later on. 
+
+```{r}
+retweets_deg_df %>% 
+  arrange(- tweets_in) %>% 
+  head(10)
+```
+
+Next, we sort with respect to `tweets_out`, which measures users who retweeted the most. 
+
+```{r}
+retweets_deg_df %>% 
+  arrange(- tweets_out) %>% 
+  head(10)
+```
+
+---
+**NOTE**
+
+I am not sure this is very useful information
+---
+
+## Visualize Retweet Network 
+
+```{r}
+red_retweet_network_df <- get_retweet_network_df(data_df = data_df, weight_threshold = 11)
+red_retweet_network <- get_retweet_network(retweet_network_df = red_retweet_network_df)
+retweets_deg_df <- get_retweets_deg_df(retweets_network = red_retweet_network )
+
+top_retweeted <- retweets_deg_df %>% 
+  arrange(- tweets_in) %>% 
+  head(20) %>% 
+  pull(screen_name)
+
+top_retweeted_names <- ifelse(
+  test = V(red_retweet_network)$name %in% top_retweeted, 
+  yes = V(red_retweet_network)$name, 
+  no = ""
+)
+```
+
+---
+**NOTE**
+
+Q: Why did we choose 11 as the threshold?
+A: Visualization purposes. 
+---
+
+```{r}
+pdf("../images/retweet_network.pdf") 
+
+plot(
+  red_retweet_network , 
+  vertex.color = "lightblue",
+  vertex.frame.color = "lightblue",
+  # Scale node size by degree.
+  vertex.size = (5E-4)*(V(red_retweet_network)$tweets_in + 1),
+  vertex.label.color = "black", 
+  vertex.label.cex = (4.3E-2)*((V(red_retweet_network)$tweets_in + 1)^(1/5)), 
+  vertex.label.dist = 0.0,
+  vertex.label = top_retweeted_names,
+  edge.color = "gray", 
+  # Set edge width proportional to the weight relative value.
+  edge.width = (1E-3)*E(red_retweet_network)$weight_scaled,
+  edge.arrow.size = 0.03,
+  main = '21N - Twitter', 
+  sub = "Retweet Network", 
+  alpha = 50
+)
+
+dev.off()
+```
+---
+**NOTE**
+
+Q: Do we need the proportional width for the edges? I can't really see any difference in the figure. 
+A: This is WIP, might be useful for other plots. 
+---
+
+---
+**NOTE**
+
+Q: I wonder if we can make a static version of the network? I think the benefit of having a dynamic network is outweighed by the computational cost of having it running in the background of the browser. 
+A: The current network is static (pdf)
+
+Q: Can we remove the names of the users that retweeted the most retweeted individuals? I think it's interesting to see that, for example, Felix de Bedut got retweeted a lot, but I am not really interested in who did it, unless it was someone else that got retweeted a lot. What do you think? 
+A: Good idea! Lets do it on a different PR. 
