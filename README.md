@@ -6,6 +6,11 @@ Twitter Analysis from the 21N (21-November-2019) protests in Colombia (Work In P
 
 ![im](images/network_screenshot.png)
 
+## Contributors 
+
+- [Sebastián Martínez](https://github.com/martinezsebastian)
+- [Juan Camilo Orduz](https://github.com/juanitorduz)
+
 ## Data Source:
 
 We used the [`rtweet`](https://github.com/ropensci/rtweet) [R](https://www.r-project.org/) package to fetch a sample of tweets during the protests period. We tried to cover a large topic spectrum via the following keywords:
