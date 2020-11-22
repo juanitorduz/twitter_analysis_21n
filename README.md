@@ -39,7 +39,7 @@ In this repository you can find some data pre-processing and initial exploratory
 
 Despite the fact we have not had the capacity to dig deeper into the analysis, we still believe there is very interesting insights to be extracted from this data. 
 
-If you would like to have access to the data and/or contribute to this repository do not hesitate to [contact us](mailto:juanitorduz@gmail.com).
+If you would like to have access to the data and/or contribute to this repository do not hesitate to [contact us](mailto:juanitorduz@gmail.com). You could also create an issue to suggest ideas or directions for future development. 
 
 ## Set Up
 
