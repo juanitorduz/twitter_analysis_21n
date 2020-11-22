@@ -2,10 +2,12 @@
 
 ## Description:
 
-Twitter Analysis from the 21N (21-November-2019) protests in Colombia (Work In Progress!).
+Analysis of available Tweets from the 21N protests in Colombia (Work In Progress!).
+The available data covers all tweets sent from the before the beginning of the protests on the 21st of November, to a couple of days after. The actual demonstrations lasted for weeks, but we focused on the data from the beginning of the event. 
 
 ![im](images/network_screenshot.png)
 
+Note: The colors in the graph are the result of a topic detection algorithms.  
 ## Contributors 
 
 - [Sebastián Martínez](https://github.com/martinezsebastian)
@@ -34,7 +36,7 @@ We used the [`rtweet`](https://github.com/ropensci/rtweet) [R](https://www.r-pro
   "#23N",
   "#ToqueDeQueda"
 ```
-[Here](https://github.com/juanitorduz/twitter_analysis_21n/blob/master/data_fetching/get_twitter_data.R) is the script we used to fetch the data. The sample data is stored as an `.rds` file. Our dataset contains 1006484 tweets.
+[Here](https://github.com/juanitorduz/twitter_analysis_21n/blob/master/data_fetching/get_twitter_data.R) is the script we used to fetch the data. The sample data is stored as an `.rds` file and contains 1,006,484 tweets.
 
 ![image2](images/tweets_over_time.png)
 
@@ -42,13 +44,7 @@ We used the [`rtweet`](https://github.com/ropensci/rtweet) [R](https://www.r-pro
 
 In this repository you can find some data pre-processing and initial exploratory data analysis: word counts, topic modeling and network (retweet) analysis.
 
-Despite the fact we have not had the capacity to dig deeper into the analysis, we still believe there is very interesting insights to be extracted from this data. 
-
-If you would like to have access to the data and/or contribute to this repository do not hesitate to [contact us](mailto:juanitorduz@gmail.com). You could also create an issue to suggest ideas or directions for future development. 
-
-## Set Up
-
-We assume the data is stored in the `data` folder. 
+We have not had the capacity to dig deeper into the analysis, but we believe there are interesting insights to be extracted from this data. If you would like to have access to the data and/or contribute to this repository please do not hesitate to [contact us](mailto:juanitorduz@gmail.com). You could also create an issue to suggest ideas or directions for future development. 
 
 ## Data Processing
 
@@ -56,10 +52,5 @@ We assume the data is stored in the `data` folder.
 Rscript R/data_processing.R
 ```
 
-## Testing 
-
-```r
-testthat::test_dir(path = "tests/")
-```
 
 
